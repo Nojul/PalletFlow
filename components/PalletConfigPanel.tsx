@@ -1,5 +1,3 @@
-"use client";
-
 import { PalletConfig } from "@/lib/types";
 import { ArrowRight, CircleDollarSign, Square } from "lucide-react";
 

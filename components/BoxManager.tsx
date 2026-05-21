@@ -1,5 +1,3 @@
-"use client";
-
 import { BoxTemplate } from "@/lib/types";
 import { Plus, Trash2 } from "lucide-react";
 

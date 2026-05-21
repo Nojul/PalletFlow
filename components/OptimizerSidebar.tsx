@@ -1,5 +1,3 @@
-"use client";
-
 import { ArrowRight, AlertTriangle, Layers } from "lucide-react";
 
 type LevelOption = {
