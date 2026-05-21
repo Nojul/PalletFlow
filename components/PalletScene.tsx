@@ -7,7 +7,7 @@ import { PlacedBox, PalletConfig } from "@/lib/types";
 type Props = {
   pallet: PalletConfig;
   boxes: PlacedBox[];
-  activeLayer: number;
+  activeLayer: number | "all";
   onHoverBox?: (boxId: string | null) => void;
 };
 
@@ -43,8 +43,12 @@ export function PalletScene({ pallet, boxes, activeLayer, onHoverBox }: Props) {
     <div className="relative h-full overflow-hidden rounded-[2rem] border border-slate-800/80 bg-slate-950/80 shadow-soft">
       <Canvas
         camera={{
-          position: [pallet.width, pallet.height * 0.8, pallet.depth * 1.8],
-          fov: 40,
+          position: [
+            pallet.width * 1.2,
+            pallet.height * 0.75,
+            pallet.depth * 1.4,
+          ],
+          fov: 42,
         }}
       >
         <ambientLight intensity={0.35} />
@@ -54,19 +58,21 @@ export function PalletScene({ pallet, boxes, activeLayer, onHoverBox }: Props) {
           enablePan
           enableZoom
           enableRotate
-          target={[pallet.width / 2, 0, pallet.depth / 2]}
+          target={[pallet.width / 2, pallet.height / 4, pallet.depth / 2]}
         />
         <mesh
           rotation={[-Math.PI / 2, 0, 0]}
           position={[pallet.width / 2, 0, pallet.depth / 2]}
-        ></mesh>
-        {/* base palette */}
-        <mesh position={[pallet.width / 2, -0.5, pallet.depth / 2]}>
-          <boxGeometry args={[pallet.width + 2, 1, pallet.depth + 2]} />
-          <meshStandardMaterial color="#c09c30" />
+        >
+          <planeGeometry args={[pallet.width, pallet.depth]} />
+          <meshStandardMaterial color="#1e293b" opacity={0.88} transparent />
+        </mesh>
+        <mesh position={[pallet.width / 2, -2.5, pallet.depth / 2]}>
+          <boxGeometry args={[pallet.width + 4, 5, pallet.depth + 4]} />
+          <meshStandardMaterial color="#0f172a" />
         </mesh>
         {boxes
-          .filter((box) => box.layer === activeLayer)
+          .filter((box) => box.layer === activeLayer || activeLayer === "all")
           .map((box) => (
             <BoxMesh
               key={box.id}

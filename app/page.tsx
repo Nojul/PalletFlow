@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { BoxManager } from "@/components/BoxManager";
 import { OptimizerSidebar } from "@/components/OptimizerSidebar";
 import { PalletConfigPanel } from "@/components/PalletConfigPanel";
@@ -46,13 +46,41 @@ export default function HomePage() {
   const [placedBoxes, setPlacedBoxes] = useState(
     [] as Array<ReturnType<typeof buildPackingPlan>[number]>,
   );
-  const [activeLayer, setActiveLayer] = useState(0);
+  const [activeLayer, setActiveLayer] = useState<number | "all">(0);
   const [hovered, setHovered] = useState<string | null>(null);
+
+  const levelOptions = useMemo(() => {
+    const uniqueLevels = Array.from(
+      new Set(placedBoxes.map((item) => item.layer)),
+    ).sort((a, b) => a - b);
+
+    const levelItems = uniqueLevels.map((layer, index) => ({
+      value: layer,
+      label: index === 0 ? "First level" : `Level ${index + 1}`,
+      subtitle:
+        layer === 0 ? "Ground floor" : `${Math.round(layer)} cm above base`,
+    }));
+
+    return [
+      {
+        value: "all" as const,
+        label: "All levels",
+        subtitle: "View the full stack",
+      },
+      ...levelItems,
+    ];
+  }, [placedBoxes]);
+
+  useEffect(() => {
+    if (!levelOptions.some((item) => item.value === activeLayer)) {
+      setActiveLayer(levelOptions[0]?.value ?? 0);
+    }
+  }, [levelOptions, activeLayer]);
 
   const optimize = () => {
     const plan = buildPackingPlan(pallet, boxes);
     setPlacedBoxes(plan);
-    setActiveLayer(0);
+    setActiveLayer("all");
   };
 
   const resetLayout = () => {
@@ -90,11 +118,6 @@ export default function HomePage() {
     placedBoxes.length,
     totalBoxes,
   ]);
-
-  const maxLayer = useMemo(
-    () => Math.max(0, ...placedBoxes.map((item) => item.layer)),
-    [placedBoxes],
-  );
 
   const hoveredDetails = placedBoxes.find((box) => box.id === hovered);
 
@@ -183,8 +206,8 @@ export default function HomePage() {
             maxWeight={pallet.maxWeight}
             warnings={warnings}
             activeLayer={activeLayer}
-            maxLayer={maxLayer}
-            onLayerChange={setActiveLayer}
+            layers={levelOptions}
+            onSelectLayer={setActiveLayer}
             onOptimize={optimize}
             onReset={resetLayout}
           />

@@ -26,12 +26,20 @@ export function BoxManager({ boxes, onChange }: Props) {
     field: keyof BoxTemplate,
     value: string | number,
   ) => {
+    const numericFields: Array<keyof BoxTemplate> = [
+      "width",
+      "depth",
+      "height",
+      "weight",
+      "quantity",
+    ];
+
     onChange(
       boxes.map((box) =>
         box.id === id
           ? {
               ...box,
-              [field]: typeof value === "string" ? Number(value) : value,
+              [field]: numericFields.includes(field) ? Number(value) : value,
             }
           : box,
       ),
@@ -117,8 +125,25 @@ export function BoxManager({ boxes, onChange }: Props) {
                   />
                 </label>
               ))}
-              <label className="block text-sm text-slate-300 sm:col-span-2">
-                <span className="mb-2 block text-slate-400">Color</span>
+              <div className="sm:col-span-2">
+                <p className="mb-2 text-sm text-slate-400">Color</p>
+                <div className="mb-3 flex flex-wrap items-center gap-2">
+                  {["#38bdf8", "#a855f7", "#34d399", "#f97316", "#facc15"].map(
+                    (swatch) => (
+                      <button
+                        key={swatch}
+                        type="button"
+                        onClick={() => updateBox(box.id, "color", swatch)}
+                        className="h-9 w-9 rounded-full border-2 transition focus:outline-none"
+                        style={{
+                          backgroundColor: swatch,
+                          borderColor:
+                            box.color === swatch ? "#ffffff" : "transparent",
+                        }}
+                      />
+                    ),
+                  )}
+                </div>
                 <input
                   type="color"
                   value={box.color}
@@ -127,7 +152,7 @@ export function BoxManager({ boxes, onChange }: Props) {
                   }
                   className="h-12 w-full cursor-pointer rounded-2xl border border-slate-800 bg-slate-950/90 p-1"
                 />
-              </label>
+              </div>
             </div>
           </div>
         ))}

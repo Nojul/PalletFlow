@@ -1,6 +1,12 @@
 "use client";
 
-import { ArrowRight, AlertTriangle, BarChart3, Layers } from "lucide-react";
+import { ArrowRight, AlertTriangle, Layers } from "lucide-react";
+
+type LevelOption = {
+  value: number | "all";
+  label: string;
+  subtitle: string;
+};
 
 type Props = {
   totalBoxes: number;
@@ -11,9 +17,9 @@ type Props = {
   totalWeight: number;
   maxWeight: number;
   warnings: string[];
-  activeLayer: number;
-  maxLayer: number;
-  onLayerChange: (newLayer: number) => void;
+  activeLayer: number | "all";
+  layers: LevelOption[];
+  onSelectLayer: (newLayer: number | "all") => void;
   onOptimize: () => void;
   onReset: () => void;
 };
@@ -28,11 +34,16 @@ export function OptimizerSidebar({
   maxWeight,
   warnings,
   activeLayer,
-  maxLayer,
-  onLayerChange,
+  layers,
+  onSelectLayer,
   onOptimize,
   onReset,
 }: Props) {
+  const activeLabel =
+    activeLayer === "all"
+      ? "All levels"
+      : (layers.find((item) => item.value === activeLayer)?.label ??
+        "Layer view");
   return (
     <section className="space-y-4 rounded-3xl border border-slate-800/80 bg-slate-950/70 p-5 shadow-soft backdrop-blur-sm">
       <div className="flex items-center justify-between gap-3">
@@ -66,18 +77,29 @@ export function OptimizerSidebar({
         <div className="rounded-3xl bg-slate-950/90 p-3 text-xs text-slate-400">
           <div className="flex items-center gap-2 text-slate-300">
             <Layers size={16} />
-            <span>Layer</span>
+            <span>Levels</span>
           </div>
-          <input
-            type="range"
-            min={0}
-            max={Math.max(0, maxLayer)}
-            value={activeLayer}
-            onChange={(event) => onLayerChange(Number(event.target.value))}
-            className="mt-3 w-full accent-brand-500"
-          />
-          <p className="mt-2 text-xs text-slate-400">
-            Viewing layer {activeLayer}
+          <div className="mt-3 grid gap-2">
+            {layers.map((item) => (
+              <button
+                key={String(item.value)}
+                type="button"
+                onClick={() => onSelectLayer(item.value)}
+                className={`rounded-2xl border px-3 py-3 text-left transition ${
+                  item.value === activeLayer
+                    ? "border-brand-500 bg-brand-500/10 text-white"
+                    : "border-slate-800 bg-slate-900/80 text-slate-300 hover:border-slate-600"
+                }`}
+              >
+                <div className="font-semibold">{item.label}</div>
+                <div className="text-[11px] text-slate-500">
+                  {item.subtitle}
+                </div>
+              </button>
+            ))}
+          </div>
+          <p className="mt-3 text-xs text-slate-400">
+            Current view: {activeLabel}
           </p>
         </div>
       </div>
