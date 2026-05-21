@@ -6,6 +6,30 @@ export function getVolume(width: number, depth: number, height: number) {
   return width * depth * height;
 }
 
+type OrientationVariant = {
+  width: number;
+  depth: number;
+  height: number;
+  rotationX: 0 | 90;
+  rotationY: 0 | 90;
+};
+
+function getOrientation(item: { width: number; depth: number; height: number }, rotationX: 0 | 90, rotationY: 0 | 90): OrientationVariant {
+  let width = item.width;
+  let depth = item.depth;
+  let height = item.height;
+
+  if (rotationY === 90) {
+    [width, depth] = [depth, width];
+  }
+
+  if (rotationX === 90) {
+    [height, depth] = [depth, height];
+  }
+
+  return { width, depth, height, rotationX, rotationY };
+}
+
 function collide(a: PlacedBox, b: PlacedBox) {
   return (
     a.x < b.x + b.width &&
@@ -55,30 +79,36 @@ export function buildPackingPlan(pallet: PalletConfig, boxes: BoxTemplate[]) {
   };
 
   const tryPlace = (item: typeof items[number]) => {
-    const heightVariants: Array<{ width: number; depth: number; rotation: 0 | 90 }> = [
-      { width: item.width, depth: item.depth, rotation: 0 },
-      { width: item.depth, depth: item.width, rotation: 90 },
+    const orientationVariants: OrientationVariant[] = [
+      getOrientation(item, 0, 0),
+      getOrientation(item, 0, 90),
+      getOrientation(item, 90, 0),
+      getOrientation(item, 90, 90),
     ];
 
     const zCandidates = expandPositions();
 
     for (const z of zCandidates) {
-      for (const variant of heightVariants) {
+      for (const variant of orientationVariants) {
         for (let x = 0; x <= pallet.width - variant.width; x += 2) {
           for (let y = 0; y <= pallet.depth - variant.depth; y += 2) {
             const candidate = {
               id: createId(),
               boxId: item.boxId,
               name: item.name,
+              originalWidth: item.width,
+              originalDepth: item.depth,
+              originalHeight: item.height,
               width: variant.width,
               depth: variant.depth,
-              height: item.height,
+              height: variant.height,
               weight: item.weight,
               color: item.color,
               x,
               y,
               z,
-              rotation: variant.rotation,
+              rotationX: variant.rotationX,
+              rotationY: variant.rotationY,
               layer: z === 0 ? 0 : z,
             };
             if (!fitsInside(pallet, candidate, candidate)) continue;

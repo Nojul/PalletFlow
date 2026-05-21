@@ -34,7 +34,7 @@ export function PalletConfigPanel({ config, onChange }: Props) {
   };
 
   return (
-    <section className="space-y-4 rounded-3xl border border-slate-800/80 bg-slate-950/70 p-5 shadow-soft backdrop-blur-sm">
+    <section className="space-y-3 rounded-3xl border border-slate-800/80 bg-slate-950/70 p-4 shadow-soft backdrop-blur-sm">
       <div className="flex items-center gap-3">
         <div className="rounded-2xl bg-brand-500/10 p-3 text-brand-300">
           <Square size={20} />
@@ -49,7 +49,7 @@ export function PalletConfigPanel({ config, onChange }: Props) {
         </div>
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-2">
+      <div className="grid gap-2 sm:grid-cols-2">
         {[
           { label: "Width", field: "width" },
           { label: "Depth", field: "depth" },
@@ -65,21 +65,21 @@ export function PalletConfigPanel({ config, onChange }: Props) {
               onChange={(event) =>
                 update(item.field as keyof PalletConfig, event.target.value)
               }
-              className="w-full rounded-2xl border border-slate-800 bg-slate-950/90 px-3 py-3 text-white outline-none transition focus:border-brand-400"
+              className="w-full rounded-2xl border border-slate-800 bg-slate-950/90 px-3 py-2 text-white outline-none transition focus:border-brand-400"
             />
           </label>
         ))}
       </div>
 
-      <div className="space-y-3">
+      <div className="space-y-2">
         <p className="text-sm text-slate-400">Quick presets</p>
-        <div className="flex flex-wrap gap-3">
+        <div className="flex flex-wrap gap-2">
           {presets.map((preset) => (
             <button
               key={preset.label}
               type="button"
               onClick={() => onChange(preset.config)}
-              className="inline-flex items-center gap-2 rounded-2xl border border-slate-800/80 bg-slate-900 px-4 py-3 text-sm text-slate-200 transition hover:border-brand-400"
+              className="inline-flex items-center gap-2 rounded-2xl border border-slate-800/80 bg-slate-900 px-3 py-2 text-sm text-slate-200 transition hover:border-brand-400"
             >
               <ArrowRight size={16} />
               {preset.label}
@@ -88,7 +88,7 @@ export function PalletConfigPanel({ config, onChange }: Props) {
         </div>
       </div>
 
-      <div className="rounded-3xl border border-slate-800/80 bg-slate-900/80 p-4">
+      <div className="rounded-3xl border border-slate-800/80 bg-slate-900/80 p-3">
         <div className="flex items-center justify-between text-sm text-slate-400">
           <span>Unit</span>
           <div className="inline-flex rounded-full bg-slate-950 px-3 py-1 text-slate-200">

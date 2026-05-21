@@ -14,6 +14,9 @@ export type PlacedBox = {
   id: string;
   boxId: string;
   name: string;
+  originalWidth: number;
+  originalDepth: number;
+  originalHeight: number;
   width: number;
   depth: number;
   height: number;
@@ -22,7 +25,8 @@ export type PlacedBox = {
   x: number;
   y: number;
   z: number;
-  rotation: 0 | 90;
+  rotationX: 0 | 90;
+  rotationY: 0 | 90;
   layer: number;
 };
 

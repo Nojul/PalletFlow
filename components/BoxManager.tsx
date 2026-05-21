@@ -50,8 +50,8 @@ export function BoxManager({ boxes, onChange }: Props) {
     onChange(boxes.filter((box) => box.id !== id));
 
   return (
-    <section className="space-y-4 rounded-3xl border border-slate-800/80 bg-slate-950/70 p-5 shadow-soft backdrop-blur-sm">
-      <div className="flex items-center justify-between gap-3">
+    <section className="space-y-3 rounded-3xl border border-slate-800/80 bg-slate-950/70 p-4 shadow-soft backdrop-blur-sm">
+      <div className="flex items-center justify-between gap-2">
         <div>
           <h2 className="text-sm font-semibold text-slate-100">
             Box templates
@@ -63,7 +63,7 @@ export function BoxManager({ boxes, onChange }: Props) {
         <button
           type="button"
           onClick={() => onChange([...boxes, defaultBox()])}
-          className="inline-flex items-center gap-2 rounded-2xl bg-brand-500 px-4 py-3 text-sm font-semibold text-white transition hover:bg-brand-600"
+          className="inline-flex items-center gap-2 rounded-2xl bg-brand-500 px-4 py-2 text-sm font-semibold leading-none text-white transition hover:bg-brand-600"
         >
           <Plus size={16} /> Add box type
         </button>
@@ -73,7 +73,7 @@ export function BoxManager({ boxes, onChange }: Props) {
         {boxes.map((box) => (
           <div
             key={box.id}
-            className="rounded-3xl border border-slate-800 bg-slate-900 p-4"
+            className="rounded-3xl border border-slate-800 bg-slate-900 p-3"
           >
             <div className="flex items-start justify-between gap-3">
               <div>
@@ -92,7 +92,7 @@ export function BoxManager({ boxes, onChange }: Props) {
                 <Trash2 size={16} />
               </button>
             </div>
-            <div className="mt-4 grid gap-3 sm:grid-cols-2">
+            <div className="mt-3 grid gap-2 sm:grid-cols-2">
               {[
                 { label: "Name", field: "name", type: "text" },
                 { label: "Width", field: "width", type: "number" },
@@ -121,13 +121,13 @@ export function BoxManager({ boxes, onChange }: Props) {
                       )
                     }
                     min={input.type === "number" ? 0 : undefined}
-                    className="w-full rounded-2xl border border-slate-800 bg-slate-950/90 px-3 py-3 text-white outline-none transition focus:border-brand-400"
+                    className="w-full rounded-2xl border border-slate-800 bg-slate-950/90 px-3 py-2 text-white outline-none transition focus:border-brand-400"
                   />
                 </label>
               ))}
               <div className="sm:col-span-2">
                 <p className="mb-2 text-sm text-slate-400">Color</p>
-                <div className="mb-3 flex flex-wrap items-center gap-2">
+                <div className="mb-2 flex flex-wrap items-center gap-2">
                   {["#38bdf8", "#a855f7", "#34d399", "#f97316", "#facc15"].map(
                     (swatch) => (
                       <button

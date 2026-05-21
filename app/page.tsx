@@ -123,8 +123,8 @@ export default function HomePage() {
 
   return (
     <main className="min-h-screen px-6 py-6 lg:px-10">
-      <div className="mx-auto max-w-[1700px] space-y-6">
-        <header className="rounded-[2rem] border border-slate-800/80 bg-slate-950/70 p-8 shadow-soft backdrop-blur-xl">
+      <div className="mx-auto max-w-[1440px] space-y-5">
+        <header className="rounded-[2rem] border border-slate-800/80 bg-slate-950/70 p-6 shadow-soft backdrop-blur-xl">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
             <div className="space-y-4">
               <p className="text-sm uppercase tracking-[0.25em] text-brand-300/80">
@@ -141,57 +141,61 @@ export default function HomePage() {
           </div>
         </header>
 
-        <div className="grid gap-6 xl:grid-cols-[360px_minmax(0,1fr)_360px]">
-          <div className="space-y-6">
+        <div className="grid gap-5 xl:grid-cols-[minmax(260px,300px)_minmax(0,1.8fr)_minmax(220px,260px)]">
+          <div className="space-y-5">
             <PalletConfigPanel config={pallet} onChange={setPallet} />
             <BoxManager boxes={boxes} onChange={setBoxes} />
           </div>
 
           <div className="space-y-6">
-            <div className="rounded-[2rem] border border-slate-800/80 bg-slate-950/70 p-5 shadow-soft">
-              <div className="grid gap-4 lg:grid-cols-[1fr_300px]">
-                <div className="h-[640px] min-h-[420px]">
-                  <PalletScene
-                    pallet={pallet}
-                    boxes={placedBoxes}
-                    activeLayer={activeLayer}
-                    onHoverBox={setHovered}
-                  />
-                </div>
-                <div className="space-y-4">
-                  <div className="rounded-3xl border border-slate-800/80 bg-slate-900/80 p-4 text-sm text-slate-300">
-                    <p className="text-sm font-semibold text-slate-100">
-                      Box details
+            <div className="rounded-[2rem] border border-slate-800/80 bg-slate-950/70 p-4 shadow-soft">
+              <div className="h-[500px] min-h-[340px]">
+                <PalletScene
+                  pallet={pallet}
+                  boxes={placedBoxes}
+                  activeLayer={activeLayer}
+                  onHoverBox={setHovered}
+                />
+              </div>
+            </div>
+
+            <TopDownView
+              pallet={pallet}
+              boxes={placedBoxes}
+              activeLayer={activeLayer}
+              onHoverBox={setHovered}
+              hoveredId={hovered}
+            />
+
+            <div className="rounded-3xl border border-slate-800/80 bg-slate-900/80 p-4 text-sm text-slate-300 shadow-soft">
+              <p className="text-sm font-semibold text-slate-100">
+                Box details
+              </p>
+              <div className="mt-4 min-h-[172px]">
+                {hoveredDetails ? (
+                  <div className="space-y-3">
+                    <p className="text-base font-semibold text-white">
+                      {hoveredDetails.name}
                     </p>
-                    {hoveredDetails ? (
-                      <div className="mt-4 space-y-3">
-                        <p className="text-base font-semibold text-white">
-                          {hoveredDetails.name}
-                        </p>
-                        <p>
-                          Size: {hoveredDetails.width}×{hoveredDetails.depth}×
-                          {hoveredDetails.height}
-                        </p>
-                        <p>Weight: {hoveredDetails.weight}kg</p>
-                        <p>
-                          Position: {hoveredDetails.x}, {hoveredDetails.y},{" "}
-                          {hoveredDetails.z}
-                        </p>
-                        <p>Rotation: {hoveredDetails.rotation}°</p>
-                      </div>
-                    ) : (
-                      <p className="mt-4 text-slate-500">
-                        Hover over a box in the 3D view to inspect its
-                        placement.
-                      </p>
-                    )}
+                    <p>
+                      Size: {hoveredDetails.width}×{hoveredDetails.depth}×
+                      {hoveredDetails.height}
+                    </p>
+                    <p>Weight: {hoveredDetails.weight}kg</p>
+                    <p>
+                      Position: {hoveredDetails.x}, {hoveredDetails.y},{" "}
+                      {hoveredDetails.z}
+                    </p>
+                    <p>X rotation: {hoveredDetails.rotationX}°</p>
+                    <p>Y rotation: {hoveredDetails.rotationY}°</p>
                   </div>
-                  <TopDownView
-                    pallet={pallet}
-                    boxes={placedBoxes}
-                    activeLayer={activeLayer}
-                  />
-                </div>
+                ) : (
+                  <div className="flex h-full items-center">
+                    <p className="text-slate-500">
+                      Hover a box to see details.
+                    </p>
+                  </div>
+                )}
               </div>
             </div>
           </div>

@@ -45,7 +45,7 @@ export function OptimizerSidebar({
       : (layers.find((item) => item.value === activeLayer)?.label ??
         "Layer view");
   return (
-    <section className="space-y-4 rounded-3xl border border-slate-800/80 bg-slate-950/70 p-5 shadow-soft backdrop-blur-sm">
+    <section className="space-y-3 rounded-3xl border border-slate-800/80 bg-slate-950/70 p-4 shadow-soft backdrop-blur-sm">
       <div className="flex items-center justify-between gap-3">
         <div>
           <p className="text-sm font-semibold text-slate-100">Insights</p>
@@ -55,7 +55,7 @@ export function OptimizerSidebar({
         </div>
       </div>
 
-      <div className="grid gap-3 rounded-3xl bg-slate-900/80 p-4 text-sm text-slate-300">
+      <div className="grid gap-2 rounded-3xl bg-slate-900/80 p-3 text-sm text-slate-300">
         <div className="flex items-center justify-between gap-3">
           <span>Total boxes</span>
           <span>
@@ -74,12 +74,12 @@ export function OptimizerSidebar({
           <span>Efficiency score</span>
           <span>{efficiency.toFixed(0)}</span>
         </div>
-        <div className="rounded-3xl bg-slate-950/90 p-3 text-xs text-slate-400">
+        <div className="rounded-3xl bg-slate-950/90 p-2.5 text-xs text-slate-400">
           <div className="flex items-center gap-2 text-slate-300">
             <Layers size={16} />
             <span>Levels</span>
           </div>
-          <div className="mt-3 grid gap-2">
+          <div className="mt-2 grid gap-2">
             {layers.map((item) => (
               <button
                 key={String(item.value)}
@@ -104,18 +104,18 @@ export function OptimizerSidebar({
         </div>
       </div>
 
-      <div className="space-y-3 rounded-3xl bg-slate-900/80 p-4">
+      <div className="space-y-3 rounded-3xl bg-slate-900/80 p-3">
         <button
           type="button"
           onClick={onOptimize}
-          className="inline-flex w-full items-center justify-center gap-2 rounded-3xl bg-brand-500 px-5 py-4 text-sm font-semibold text-white transition hover:bg-brand-600"
+          className="inline-flex w-full items-center justify-center gap-2 rounded-3xl bg-brand-500 px-3 py-2 text-sm font-semibold text-white transition hover:bg-brand-600"
         >
           <ArrowRight size={18} /> Optimize packing
         </button>
         <button
           type="button"
           onClick={onReset}
-          className="inline-flex w-full items-center justify-center rounded-3xl border border-slate-800 bg-slate-950/90 px-5 py-4 text-sm font-semibold text-slate-300 transition hover:border-brand-400"
+          className="inline-flex w-full items-center justify-center rounded-3xl border border-slate-800 bg-slate-950/90 px-3 py-2 text-sm font-semibold text-slate-300 transition hover:border-brand-400"
         >
           Reset layout
         </button>

@@ -24,10 +24,17 @@ const BoxMesh = ({
       box.z + box.height / 2,
       box.y + box.depth / 2,
     ]}
+    rotation={[
+      (box.rotationX * Math.PI) / 180,
+      (box.rotationY * Math.PI) / 180,
+      0,
+    ]}
     onPointerOver={() => onHover(box.id)}
     onPointerOut={() => onHover(null)}
   >
-    <boxGeometry args={[box.width, box.height, box.depth]} />
+    <boxGeometry
+      args={[box.originalWidth, box.originalHeight, box.originalDepth]}
+    />
     <meshStandardMaterial
       color={box.color}
       roughness={0.35}
@@ -59,17 +66,21 @@ export function PalletScene({ pallet, boxes, activeLayer, onHoverBox }: Props) {
           enableZoom
           enableRotate
           target={[pallet.width / 2, pallet.height / 4, pallet.depth / 2]}
+          minDistance={Math.max(
+            20,
+            Math.min(pallet.width, pallet.depth) * 0.75,
+          )}
+          maxDistance={Math.max(pallet.width, pallet.depth) * 3.5}
+          minPolarAngle={0.25 * Math.PI}
+          maxPolarAngle={1.35 * Math.PI}
         />
         <mesh
           rotation={[-Math.PI / 2, 0, 0]}
           position={[pallet.width / 2, 0, pallet.depth / 2]}
-        >
-          <planeGeometry args={[pallet.width, pallet.depth]} />
-          <meshStandardMaterial color="#1e293b" opacity={0.88} transparent />
-        </mesh>
+        ></mesh>
         <mesh position={[pallet.width / 2, -2.5, pallet.depth / 2]}>
           <boxGeometry args={[pallet.width + 4, 5, pallet.depth + 4]} />
-          <meshStandardMaterial color="#0f172a" />
+          <meshStandardMaterial color="#C08A4B" />
         </mesh>
         {boxes
           .filter((box) => box.layer === activeLayer || activeLayer === "all")
