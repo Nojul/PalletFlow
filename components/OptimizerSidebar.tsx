@@ -1,4 +1,5 @@
 import { ArrowRight, AlertTriangle, Layers } from "lucide-react";
+import { useState } from "react";
 
 type LevelOption = {
   value: number | "all";
@@ -60,6 +61,9 @@ export function OptimizerSidebar({
       ? "All levels"
       : (layers.find((item) => item.value === activeLayer)?.label ??
         "Layer view");
+
+  const [levelsOpen, setLevelsOpen] = useState(true);
+
   return (
     <section className="space-y-3 rounded-3xl border border-slate-800/80 bg-slate-950/70 p-4 shadow-soft backdrop-blur-sm">
       <div className="flex items-center justify-between gap-3">
@@ -91,11 +95,35 @@ export function OptimizerSidebar({
           <span>{efficiency.toFixed(0)}</span>
         </div>
         <div className="rounded-3xl bg-slate-950/90 p-2.5 text-xs text-slate-400">
-          <div className="flex items-center gap-2 text-slate-300">
-            <Layers size={16} />
-            <span>Levels</span>
+          <div className="flex items-center justify-between">
+            <button
+              type="button"
+              onClick={() => setLevelsOpen((s) => !s)}
+              className="flex items-center gap-2 text-slate-300"
+            >
+              <div className="flex items-center gap-2">
+                <Layers size={16} />
+                <span>Levels</span>
+                <span className="ml-2 text-xs text-slate-500">
+                  ({layers.length})
+                </span>
+              </div>
+            </button>
+            <button
+              type="button"
+              onClick={() => setLevelsOpen((s) => !s)}
+              className={`p-1 rounded hover:bg-slate-800/50 text-slate-300 transform transition-transform ${levelsOpen ? "rotate-90" : "rotate-0"}`}
+              aria-expanded={levelsOpen}
+              aria-controls="levels-list"
+            >
+              <ArrowRight size={14} />
+            </button>
           </div>
-          <div className="mt-2 grid gap-2">
+
+          <div
+            id="levels-list"
+            className={`mt-2 grid gap-2 transition-all duration-200 ${levelsOpen ? "max-h-96" : "max-h-0 overflow-hidden"}`}
+          >
             {layers.map((item) => (
               <button
                 key={String(item.value)}
@@ -114,9 +142,11 @@ export function OptimizerSidebar({
               </button>
             ))}
           </div>
-          <p className="mt-3 text-xs text-slate-400">
-            Current view: {activeLabel}
-          </p>
+          {levelsOpen && (
+            <p className="mt-3 text-xs text-slate-400">
+              Current view: {activeLabel}
+            </p>
+          )}
         </div>
       </div>
 
