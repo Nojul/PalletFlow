@@ -28,6 +28,17 @@ export type PlacedBox = {
   rotationX: 0 | 90;
   rotationY: 0 | 90;
   layer: number;
+  visibleSides?: {
+    left: boolean;
+    right: boolean;
+    front: boolean;
+    back: boolean;
+  };
+  sideVisible?: boolean;
+  topVisible?: boolean;
+  visibilityStatus?: "side-visible" | "top-only" | "hidden";
+  scannable?: boolean;
+  invalid?: boolean;
 };
 
 export type PalletConfig = {

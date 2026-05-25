@@ -49,21 +49,158 @@ function fitsInside(pallet: PalletConfig, box: { width: number; depth: number; h
   );
 }
 
-export function buildPackingPlan(pallet: PalletConfig, boxes: BoxTemplate[]) {
-  const items = boxes.flatMap((template) =>
-    Array.from({ length: Math.max(0, template.quantity) }, (_, index) => ({
+type VisibilityStatus = "side-visible" | "top-only" | "hidden";
+
+type VisibleSides = {
+  left: boolean;
+  right: boolean;
+  front: boolean;
+  back: boolean;
+};
+
+type PackingOptions = {
+  scannableOptimization?: boolean;
+};
+
+const DEFAULT_MIN_SUPPORT = 0.7; // 70% of base area must be supported by pallet or boxes below
+
+
+const isFlush = (value: number, target: number) => Math.abs(value - target) < 1e-6;
+
+const overlaps = (
+  startA: number,
+  endA: number,
+  startB: number,
+  endB: number,
+) => startA < endB && endA > startB;
+
+function getVisibleSides(
+  pallet: PalletConfig,
+  box: PlacedBox,
+  placedBoxes: PlacedBox[],
+) {
+  const otherBoxes = placedBoxes.filter((item) => item.id !== box.id);
+  const x0 = box.x;
+  const x1 = box.x + box.width;
+  const y0 = box.y;
+  const y1 = box.y + box.depth;
+  const z0 = box.z;
+  const z1 = box.z + box.height;
+
+  const left = !otherBoxes.some(
+    (other) =>
+      overlaps(other.y, other.y + other.depth, y0, y1) &&
+      overlaps(other.z, other.z + other.height, z0, z1) &&
+      other.x < x0 &&
+      other.x + other.width > 0,
+  );
+
+  const right = !otherBoxes.some(
+    (other) =>
+      overlaps(other.y, other.y + other.depth, y0, y1) &&
+      overlaps(other.z, other.z + other.height, z0, z1) &&
+      other.x < pallet.width &&
+      other.x + other.width > x1,
+  );
+
+  const front = !otherBoxes.some(
+    (other) =>
+      overlaps(other.x, other.x + other.width, x0, x1) &&
+      overlaps(other.z, other.z + other.height, z0, z1) &&
+      other.y < y0 &&
+      other.y + other.depth > 0,
+  );
+
+  const back = !otherBoxes.some(
+    (other) =>
+      overlaps(other.x, other.x + other.width, x0, x1) &&
+      overlaps(other.z, other.z + other.height, z0, z1) &&
+      other.y < pallet.depth &&
+      other.y + other.depth > y1,
+  );
+
+  return {
+    left,
+    right,
+    front,
+    back,
+  };
+}
+
+function annotateVisibility(pallet: PalletConfig, boxes: PlacedBox[]) {
+  return boxes.map((box) => {
+    const visibleSides = getVisibleSides(pallet, box, boxes);
+    const sideVisible =
+      visibleSides.left ||
+      visibleSides.right ||
+      visibleSides.front ||
+      visibleSides.back;
+    const topVisible =
+      !boxes.some(
+        (other) =>
+          other.id !== box.id &&
+          overlaps(other.x, other.x + other.width, box.x, box.x + box.width) &&
+          overlaps(other.y, other.y + other.depth, box.y, box.y + box.depth) &&
+          other.z < pallet.height &&
+          other.z + other.height > box.z + box.height,
+      );
+    const visibilityStatus: VisibilityStatus = sideVisible
+      ? "side-visible"
+      : topVisible
+      ? "top-only"
+      : "hidden";
+
+    return {
+      ...box,
+      visibleSides,
+      sideVisible,
+      topVisible,
+      visibilityStatus,
+      scannable: sideVisible || topVisible,
+      invalid: (box.invalid ?? false) || visibilityStatus === "hidden",
+    };
+  });
+}
+
+function scorePlacement(
+  candidate: PlacedBox,
+  placed: PlacedBox[],
+  pallet: PalletConfig,
+) {
+  const allBoxes = annotateVisibility(pallet, [...placed, candidate]);
+  return allBoxes.reduce((score, item) => {
+    if (item.visibilityStatus === "side-visible") return score + 100;
+    if (item.visibilityStatus === "top-only") return score + 20;
+    return score - 200;
+  }, 0);
+}
+
+export function buildPackingPlan(
+  pallet: PalletConfig,
+  boxes: BoxTemplate[],
+  options: PackingOptions = {},
+) {
+  const minSupportFraction = Math.max(0, Math.min(1, (options as any).minSupportFraction ?? DEFAULT_MIN_SUPPORT));
+  const items = boxes.flatMap((template) => {
+    const width = Number(template.width);
+    const depth = Number(template.depth);
+    const height = Number(template.height);
+    const weight = Number(template.weight);
+    const quantity = Math.max(0, Number(template.quantity) || 0);
+
+    return Array.from({ length: quantity }, (_, index) => ({
       id: `${template.id}-${index}`,
       boxId: template.id,
       name: template.name,
-      weight: template.weight,
+      weight,
       color: template.color,
-      width: template.width,
-      depth: template.depth,
-      height: template.height,
-      volume: getVolume(template.width, template.depth, template.height),
+      width,
+      depth,
+      height,
+      volume: getVolume(width, depth, height),
       segments: template.irregularSegments,
-    }))
-  );
+    }));
+  });
 
   items.sort((a, b) => b.volume - a.volume || b.height - a.height);
 
@@ -87,6 +224,11 @@ export function buildPackingPlan(pallet: PalletConfig, boxes: BoxTemplate[]) {
     ];
 
     const zCandidates = expandPositions();
+    const scoredCandidates: Array<{
+      candidate: PlacedBox;
+      score: number;
+      coords: { x: number; y: number; z: number };
+    }> = [];
 
     for (const z of zCandidates) {
       for (const variant of orientationVariants) {
@@ -111,10 +253,25 @@ export function buildPackingPlan(pallet: PalletConfig, boxes: BoxTemplate[]) {
               rotationY: variant.rotationY,
               layer: z === 0 ? 0 : z,
             };
+
             if (!fitsInside(pallet, candidate, candidate)) continue;
             const collisions = placed.some((placedItem) => collide(candidate, placedItem));
-            if (!collisions) {
+            if (collisions) continue;
+
+            // Stability/support check: compute fraction of base area supported at this z
+            const supportFraction = computeSupportFraction(candidate, placed, pallet);
+            if (supportFraction < minSupportFraction) continue;
+
+            if (options.scannableOptimization) {
+              scoredCandidates.push({
+                candidate,
+                score: scorePlacement(candidate, placed, pallet),
+                coords: { x, y, z },
+              });
+            } else {
               placed.push(candidate);
+              // stabilize after placing
+              stabilizePlaced(placed, pallet, minSupportFraction);
               return true;
             }
           }
@@ -122,12 +279,90 @@ export function buildPackingPlan(pallet: PalletConfig, boxes: BoxTemplate[]) {
       }
     }
 
+    if (scoredCandidates.length > 0) {
+      scoredCandidates.sort((a, b) =>
+        b.score - a.score ||
+        a.coords.z - b.coords.z ||
+        a.coords.x - b.coords.x ||
+        a.coords.y - b.coords.y,
+      );
+      placed.push(scoredCandidates[0].candidate);
+      // After placing, stabilize stack (snap down unsupported boxes where possible)
+      stabilizePlaced(placed, pallet, minSupportFraction);
+      return true;
+    }
+
     return false;
   };
 
   items.forEach((item) => tryPlace(item));
 
-  return placed;
+  return annotateVisibility(pallet, placed);
+}
+
+// Compute support area fraction for a candidate placed at its current z
+function computeSupportFraction(candidate: PlacedBox, placed: PlacedBox[], pallet: PalletConfig) {
+  const eps = 1e-6;
+  if (candidate.z <= eps) return 1; // fully supported by pallet
+
+  const baseArea = candidate.width * candidate.depth;
+  if (baseArea <= 0) return 0;
+
+  // supporting boxes are those whose top equals candidate.z
+  const supporting = placed.filter((b) => Math.abs(b.z + b.height - candidate.z) < eps && b.id !== candidate.id);
+
+  let supportArea = 0;
+  for (const b of supporting) {
+    const overlapX = Math.max(0, Math.min(b.x + b.width, candidate.x + candidate.width) - Math.max(b.x, candidate.x));
+    const overlapY = Math.max(0, Math.min(b.y + b.depth, candidate.y + candidate.depth) - Math.max(b.y, candidate.y));
+    supportArea += overlapX * overlapY;
+  }
+
+  return supportArea / baseArea;
+}
+
+// Try to snap unstable boxes down to nearest supporting z (or mark invalid if none)
+function stabilizePlaced(placed: PlacedBox[], pallet: PalletConfig, minSupportFraction: number) {
+  const eps = 1e-6;
+  // collect candidate z positions (pallet base and all tops)
+  const positions = new Set<number>([0]);
+  placed.forEach((b) => positions.add(b.z + b.height));
+  const zCandidates = Array.from(positions).sort((a, b) => a - b);
+
+  // iterate boxes from lowest to highest so we settle the stack
+  const sorted = [...placed].sort((a, b) => a.z - b.z);
+  for (const box of sorted) {
+    const currentSupport = computeSupportFraction(box, placed, pallet);
+    if (currentSupport >= minSupportFraction) {
+      box.invalid = false;
+      continue;
+    }
+
+    // try lower z positions (closest below current)
+    const lowerZ = zCandidates.filter((z) => z < box.z).sort((a, b) => b - a);
+    let snapped = false;
+    for (const z of lowerZ) {
+      // temporarily set z and check collisions
+      const origZ = box.z;
+      box.z = z;
+      const collisions = placed.some((other) => other.id !== box.id && collide(box, other));
+      if (collisions) {
+        box.z = origZ;
+        continue;
+      }
+      const support = computeSupportFraction(box, placed, pallet);
+      if (support >= minSupportFraction) {
+        snapped = true;
+        box.invalid = false;
+        break;
+      }
+      box.z = origZ;
+    }
+
+    if (!snapped) {
+      box.invalid = true; // mark as unstable/invalid
+    }
+  }
 }
 
 export function summarizePacking(pallet: PalletConfig, placed: PlacedBox[]) {

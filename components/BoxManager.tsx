@@ -1,5 +1,6 @@
+import { useEffect, useState } from "react";
 import { BoxTemplate } from "@/lib/types";
-import { Plus, Trash2 } from "lucide-react";
+import { Plus, Trash2, ChevronDown, ChevronRight } from "lucide-react";
 
 type Props = {
   boxes: BoxTemplate[];
@@ -37,7 +38,11 @@ export function BoxManager({ boxes, onChange }: Props) {
         box.id === id
           ? {
               ...box,
-              [field]: numericFields.includes(field) ? Number(value) : value,
+              [field]: numericFields.includes(field)
+                ? value === ""
+                  ? ("" as unknown as number)
+                  : Number(value)
+                : value,
             }
           : box,
       ),
@@ -47,17 +52,43 @@ export function BoxManager({ boxes, onChange }: Props) {
   const removeBox = (id: string) =>
     onChange(boxes.filter((box) => box.id !== id));
 
+  const [expanded, setExpanded] = useState(true);
+  const [expandedIds, setExpandedIds] = useState<Record<string, boolean>>(() =>
+    Object.fromEntries(boxes.map((box) => [box.id, true])),
+  );
+
+  useEffect(() => {
+    setExpandedIds((prev) => {
+      const next = { ...prev };
+      boxes.forEach((box) => {
+        if (!(box.id in next)) next[box.id] = true;
+      });
+      return next;
+    });
+  }, [boxes]);
+
   return (
     <section className="space-y-3 rounded-3xl border border-slate-800/80 bg-slate-950/70 p-4 shadow-soft backdrop-blur-sm">
       <div className="flex items-center justify-between gap-2">
-        <div>
-          <h2 className="text-sm font-semibold text-slate-100">
-            Box templates
-          </h2>
-          <p className="text-xs text-slate-400">
-            Create reusable box types and quantities for packing.
-          </p>
-        </div>
+        <button
+          type="button"
+          onClick={() => setExpanded((current) => !current)}
+          className="inline-flex items-center gap-2 text-left"
+        >
+          {expanded ? (
+            <ChevronDown size={18} className="text-slate-300" />
+          ) : (
+            <ChevronRight size={18} className="text-slate-300" />
+          )}
+          <div>
+            <h2 className="text-sm font-semibold text-slate-100">
+              Box templates
+            </h2>
+            <p className="text-xs text-slate-400">
+              Create reusable box types and quantities for packing.
+            </p>
+          </div>
+        </button>
         <button
           type="button"
           onClick={() => onChange([...boxes, defaultBox()])}
@@ -67,94 +98,135 @@ export function BoxManager({ boxes, onChange }: Props) {
         </button>
       </div>
 
-      <div className="space-y-4">
-        {boxes.map((box) => (
-          <div
-            key={box.id}
-            className="rounded-3xl border border-slate-800 bg-slate-900 p-3"
-          >
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <p className="text-sm font-semibold text-slate-100">
-                  {box.name}
-                </p>
-                <p className="text-xs text-slate-500">
-                  Volume: {box.width}×{box.depth}×{box.height}
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => removeBox(box.id)}
-                className="rounded-2xl border border-slate-700 px-3 py-2 text-slate-300 transition hover:border-red-500 hover:text-red-300"
-              >
-                <Trash2 size={16} />
-              </button>
-            </div>
-            <div className="mt-3 grid gap-2 sm:grid-cols-2">
-              {[
-                { label: "Name", field: "name", type: "text" },
-                { label: "Width", field: "width", type: "number" },
-                { label: "Depth", field: "depth", type: "number" },
-                { label: "Height", field: "height", type: "number" },
-                { label: "Weight", field: "weight", type: "number" },
-                { label: "Quantity", field: "quantity", type: "number" },
-              ].map((input) => (
-                <label
-                  key={`${box.id}-${input.field}`}
-                  className="block text-sm text-slate-300"
-                >
-                  <span className="mb-2 block text-slate-400">
-                    {input.label}
-                  </span>
-                  <input
-                    type={input.type}
-                    value={
-                      box[input.field as keyof BoxTemplate] as string | number
-                    }
-                    onChange={(event) =>
-                      updateBox(
-                        box.id,
-                        input.field as keyof BoxTemplate,
-                        event.target.value,
-                      )
-                    }
-                    min={input.type === "number" ? 0 : undefined}
-                    className="w-full rounded-2xl border border-slate-800 bg-slate-950/90 px-3 py-2 text-white outline-none transition focus:border-brand-400"
-                  />
-                </label>
-              ))}
-              <div className="sm:col-span-2">
-                <p className="mb-2 text-sm text-slate-400">Color</p>
-                <div className="mb-2 flex flex-wrap items-center gap-2">
-                  {["#38bdf8", "#a855f7", "#34d399", "#f97316", "#facc15"].map(
-                    (swatch) => (
-                      <button
-                        key={swatch}
-                        type="button"
-                        onClick={() => updateBox(box.id, "color", swatch)}
-                        className="h-9 w-9 rounded-full border-2 transition focus:outline-none"
-                        style={{
-                          backgroundColor: swatch,
-                          borderColor:
-                            box.color === swatch ? "#ffffff" : "transparent",
-                        }}
-                      />
-                    ),
-                  )}
-                </div>
-                <input
-                  type="color"
-                  value={box.color}
-                  onChange={(event) =>
-                    updateBox(box.id, "color", event.target.value)
+      {expanded ? (
+        <div className="space-y-4">
+          {boxes.map((box) => (
+            <div
+              key={box.id}
+              className="rounded-3xl border border-slate-800 bg-slate-900 p-3"
+            >
+              <div className="flex items-start justify-between gap-3">
+                <button
+                  type="button"
+                  onClick={() =>
+                    setExpandedIds((current) => ({
+                      ...current,
+                      [box.id]: !current[box.id],
+                    }))
                   }
-                  className="h-12 w-full cursor-pointer rounded-2xl border border-slate-800 bg-slate-950/90 p-1"
-                />
+                  className="flex-1 text-left"
+                >
+                  <div className="flex items-center gap-2">
+                    {expandedIds[box.id] ? (
+                      <ChevronDown size={16} className="text-slate-300" />
+                    ) : (
+                      <ChevronRight size={16} className="text-slate-300" />
+                    )}
+                    <div>
+                      <p className="text-sm font-semibold text-slate-100">
+                        {box.name}
+                      </p>
+                      <p className="text-xs text-slate-500">
+                        Volume: {box.width}×{box.depth}×{box.height}
+                      </p>
+                    </div>
+                  </div>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => removeBox(box.id)}
+                  className="rounded-2xl border border-slate-700 px-3 py-2 text-slate-300 transition hover:border-red-500 hover:text-red-300"
+                >
+                  <Trash2 size={16} />
+                </button>
               </div>
+
+              {expandedIds[box.id] !== false && (
+                <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                  {[
+                    { label: "Name", field: "name", type: "text" },
+                    { label: "Width", field: "width", type: "number" },
+                    { label: "Depth", field: "depth", type: "number" },
+                    { label: "Height", field: "height", type: "number" },
+                    { label: "Weight", field: "weight", type: "number" },
+                    { label: "Quantity", field: "quantity", type: "number" },
+                  ].map((input) => (
+                    <label
+                      key={`${box.id}-${input.field}`}
+                      className="block text-sm text-slate-300"
+                    >
+                      <span className="mb-2 block text-slate-400">
+                        {input.label}
+                      </span>
+                      <input
+                        type={input.type}
+                        value={
+                          box[input.field as keyof BoxTemplate] as
+                            | string
+                            | number
+                        }
+                        onChange={(event) =>
+                          updateBox(
+                            box.id,
+                            input.field as keyof BoxTemplate,
+                            event.target.value,
+                          )
+                        }
+                        onBlur={(event) => {
+                          if (
+                            input.type === "number" &&
+                            event.target.value === ""
+                          ) {
+                            updateBox(
+                              box.id,
+                              input.field as keyof BoxTemplate,
+                              0,
+                            );
+                          }
+                        }}
+                        min={input.type === "number" ? 0 : undefined}
+                        className="w-full rounded-2xl border border-slate-800 bg-slate-950/90 px-3 py-2 text-white outline-none transition focus:border-brand-400"
+                      />
+                    </label>
+                  ))}
+                  <div className="sm:col-span-2">
+                    <p className="mb-2 text-sm text-slate-400">Color</p>
+                    <div className="mb-2 flex flex-wrap items-center gap-2">
+                      {[
+                        "#38bdf8",
+                        "#a855f7",
+                        "#34d399",
+                        "#f97316",
+                        "#facc15",
+                      ].map((swatch) => (
+                        <button
+                          key={swatch}
+                          type="button"
+                          onClick={() => updateBox(box.id, "color", swatch)}
+                          className="h-9 w-9 rounded-full border-2 transition focus:outline-none"
+                          style={{
+                            backgroundColor: swatch,
+                            borderColor:
+                              box.color === swatch ? "#ffffff" : "transparent",
+                          }}
+                        />
+                      ))}
+                    </div>
+                    <input
+                      type="color"
+                      value={box.color}
+                      onChange={(event) =>
+                        updateBox(box.id, "color", event.target.value)
+                      }
+                      className="h-12 w-full cursor-pointer rounded-2xl border border-slate-800 bg-slate-950/90 p-1"
+                    />
+                  </div>
+                </div>
+              )}
             </div>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      ) : null}
     </section>
   );
 }

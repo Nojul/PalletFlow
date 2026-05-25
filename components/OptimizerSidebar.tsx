@@ -17,9 +17,20 @@ type Props = {
   warnings: string[];
   activeLayer: number | "all";
   layers: LevelOption[];
+  scannableOnly: boolean;
+  scannableCounts: {
+    visible: number;
+    topOnly: number;
+    hidden: number;
+  };
+  useScannableOptimization: boolean;
+  showBoxOutlines: boolean;
   onSelectLayer: (newLayer: number | "all") => void;
   onOptimize: () => void;
   onReset: () => void;
+  onToggleScannableOnly: () => void;
+  onToggleScannableOptimization: () => void;
+  onToggleBoxOutlines: () => void;
 };
 
 export function OptimizerSidebar({
@@ -33,9 +44,16 @@ export function OptimizerSidebar({
   warnings,
   activeLayer,
   layers,
+  scannableOnly,
+  scannableCounts,
+  useScannableOptimization,
+  showBoxOutlines,
   onSelectLayer,
   onOptimize,
   onReset,
+  onToggleScannableOnly,
+  onToggleScannableOptimization,
+  onToggleBoxOutlines,
 }: Props) {
   const activeLabel =
     activeLayer === "all"
@@ -103,6 +121,55 @@ export function OptimizerSidebar({
       </div>
 
       <div className="space-y-3 rounded-3xl bg-slate-900/80 p-3">
+        <label className="flex items-center gap-3 rounded-3xl border border-slate-800 bg-slate-950/90 px-3 py-3 text-sm text-slate-200">
+          <input
+            type="checkbox"
+            checked={useScannableOptimization}
+            onChange={onToggleScannableOptimization}
+            className="h-4 w-4 rounded border-slate-700 bg-slate-950 text-brand-500 focus:ring-brand-500"
+          />
+          <span>Use Scannable Layout Optimization</span>
+        </label>
+
+        <button
+          type="button"
+          onClick={onToggleScannableOnly}
+          className="inline-flex w-full items-center justify-center gap-2 rounded-3xl border border-slate-800 bg-slate-950/90 px-3 py-2 text-sm font-semibold text-slate-200 transition hover:border-brand-400"
+        >
+          {scannableOnly ? "Show full layout" : "Scannable-only view"}
+        </button>
+
+        <label className="flex items-center gap-3 rounded-3xl border border-slate-800 bg-slate-950/90 px-3 py-3 text-sm text-slate-200">
+          <input
+            type="checkbox"
+            checked={showBoxOutlines}
+            onChange={onToggleBoxOutlines}
+            className="h-4 w-4 rounded border-slate-700 bg-slate-950 text-brand-500 focus:ring-brand-500"
+          />
+          <span>Show box outlines</span>
+        </label>
+
+        <div className="grid gap-2 rounded-3xl bg-slate-950/90 p-3 text-xs text-slate-300">
+          <div className="flex items-center justify-between gap-3">
+            <span>Side-visible</span>
+            <span className="font-semibold text-slate-100">
+              {scannableCounts.visible}
+            </span>
+          </div>
+          <div className="flex items-center justify-between gap-3">
+            <span>Top-only visibility</span>
+            <span className="font-semibold text-amber-300">
+              {scannableCounts.topOnly}
+            </span>
+          </div>
+          <div className="flex items-center justify-between gap-3">
+            <span>Hidden boxes</span>
+            <span className="font-semibold text-rose-300">
+              {scannableCounts.hidden}
+            </span>
+          </div>
+        </div>
+
         <button
           type="button"
           onClick={onOptimize}

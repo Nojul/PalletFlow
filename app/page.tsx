@@ -48,6 +48,10 @@ export default function HomePage() {
   );
   const [activeLayer, setActiveLayer] = useState<number | "all">(0);
   const [hovered, setHovered] = useState<string | null>(null);
+  const [showScannableOnly, setShowScannableOnly] = useState(false);
+  const [useScannableOptimization, setUseScannableOptimization] =
+    useState(false);
+  const [showBoxOutlines, setShowBoxOutlines] = useState(false);
 
   const levelOptions = useMemo(() => {
     const uniqueLevels = Array.from(
@@ -78,21 +82,39 @@ export default function HomePage() {
   }, [levelOptions, activeLayer]);
 
   const optimize = () => {
-    const plan = buildPackingPlan(pallet, boxes);
+    const plan = buildPackingPlan(pallet, boxes, {
+      scannableOptimization: useScannableOptimization,
+    });
     setPlacedBoxes(plan);
     setActiveLayer("all");
+    setShowScannableOnly(false);
   };
 
   const resetLayout = () => {
     setPlacedBoxes([]);
     setActiveLayer(0);
     setHovered(null);
+    setShowScannableOnly(false);
   };
 
   const totalBoxes = boxes.reduce(
     (sum, item) => sum + Math.max(0, item.quantity),
     0,
   );
+
+  const visibilityCounts = useMemo(
+    () => ({
+      visible: placedBoxes.filter(
+        (box) => box.visibilityStatus === "side-visible",
+      ).length,
+      topOnly: placedBoxes.filter((box) => box.visibilityStatus === "top-only")
+        .length,
+      hidden: placedBoxes.filter((box) => box.visibilityStatus === "hidden")
+        .length,
+    }),
+    [placedBoxes],
+  );
+
   const metrics = useMemo(
     () => summarizePacking(pallet, placedBoxes),
     [pallet, placedBoxes],
@@ -110,6 +132,16 @@ export default function HomePage() {
         `${totalBoxes - placedBoxes.length} boxes could not be placed.`,
       );
     }
+    if (visibilityCounts.hidden > 0) {
+      result.push(
+        `${visibilityCounts.hidden} boxes are not externally visible.`,
+      );
+    }
+    if (visibilityCounts.topOnly > 0) {
+      result.push(
+        `${visibilityCounts.topOnly} boxes only have top visibility.`,
+      );
+    }
     return result;
   }, [
     metrics,
@@ -117,9 +149,15 @@ export default function HomePage() {
     pallet.height,
     placedBoxes.length,
     totalBoxes,
+    visibilityCounts.hidden,
+    visibilityCounts.topOnly,
   ]);
 
   const hoveredDetails = placedBoxes.find((box) => box.id === hovered);
+
+  const displayedBoxes = showScannableOnly
+    ? placedBoxes.filter((box) => box.sideVisible)
+    : placedBoxes;
 
   return (
     <main className="min-h-screen px-6 py-6 lg:px-10">
@@ -130,7 +168,7 @@ export default function HomePage() {
               <p className="text-sm uppercase tracking-[0.25em] text-brand-300/80">
                 PalletFlow
               </p>
-              <h1 className="max-w-3xl text-4xl font-semibold text-white sm:text-5xl">
+              <h1 className="max-w-9xl text-4xl font-semibold text-white sm:text-5xl">
                 3D pallet packing optimizer built for modern logistics.
               </h1>
               <p className="max-w-2xl text-slate-400">
@@ -152,8 +190,10 @@ export default function HomePage() {
               <div className="h-[500px] min-h-[340px]">
                 <PalletScene
                   pallet={pallet}
-                  boxes={placedBoxes}
+                  boxes={displayedBoxes}
                   activeLayer={activeLayer}
+                  showOnlyScannable={showScannableOnly}
+                  showBoxOutlines={showBoxOutlines}
                   onHoverBox={setHovered}
                 />
               </div>
@@ -161,7 +201,7 @@ export default function HomePage() {
 
             <TopDownView
               pallet={pallet}
-              boxes={placedBoxes}
+              boxes={displayedBoxes}
               activeLayer={activeLayer}
               onHoverBox={setHovered}
               hoveredId={hovered}
@@ -211,6 +251,19 @@ export default function HomePage() {
             warnings={warnings}
             activeLayer={activeLayer}
             layers={levelOptions}
+            scannableOnly={showScannableOnly}
+            scannableCounts={visibilityCounts}
+            useScannableOptimization={useScannableOptimization}
+            showBoxOutlines={showBoxOutlines}
+            onToggleScannableOnly={() =>
+              setShowScannableOnly((current) => !current)
+            }
+            onToggleScannableOptimization={() =>
+              setUseScannableOptimization((current) => !current)
+            }
+            onToggleBoxOutlines={() =>
+              setShowBoxOutlines((current) => !current)
+            }
             onSelectLayer={setActiveLayer}
             onOptimize={optimize}
             onReset={resetLayout}
