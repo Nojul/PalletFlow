@@ -12,6 +12,7 @@ type Props = {
   activeLayer: number | "all";
   showOnlyScannable?: boolean;
   showBoxOutlines?: boolean;
+  highlightedBoxId?: string | null;
   onHoverBox?: (boxId: string | null) => void;
 };
 
@@ -19,10 +20,14 @@ const BoxMesh = ({
   box,
   onHover,
   showOutlines,
+  offsetY,
+  highlightedBoxId,
 }: {
   box: PlacedBox;
   onHover: (id: string | null) => void;
   showOutlines: boolean;
+  offsetY: number;
+  highlightedBoxId?: string | null;
 }) => {
   // cache a box geometry and its edges so we don't recreate per-frame
   const geom = React.useMemo(
@@ -47,13 +52,16 @@ const BoxMesh = ({
     };
   }, [edges, geom]);
 
-  const outlineScale = 1.0005; // tiny outward offset to avoid z-fighting
+  const outlineScale = 1.01; // slightly larger outward offset to reduce edge z-fighting
+  const isHighlighted = highlightedBoxId === box.id;
+  const shouldShowOutlines = showOutlines || isHighlighted;
+  const outlineColor = isHighlighted ? "#f59e0b" : "#ffffff";
 
   return (
     <group
       position={[
         box.x + box.width / 2,
-        box.z + box.height / 2,
+        offsetY + box.z + box.height / 2,
         box.y + box.depth / 2,
       ]}
       rotation={[
@@ -66,7 +74,6 @@ const BoxMesh = ({
         geometry={geom}
         onPointerOver={() => onHover(box.id)}
         onPointerOut={() => onHover(null)}
-        renderOrder={0}
       >
         <meshStandardMaterial
           attach="material"
@@ -84,20 +91,19 @@ const BoxMesh = ({
         />
       </mesh>
 
-      {showOutlines && (
+      {shouldShowOutlines && (
         <lineSegments
           geometry={edges}
-          renderOrder={1}
           scale={[outlineScale, outlineScale, outlineScale]}
         >
           <lineBasicMaterial
             attach="material"
-            color="#000000"
-            transparent
-            opacity={0.95}
-            polygonOffset
-            polygonOffsetFactor={-1}
-            polygonOffsetUnits={1}
+            color={outlineColor}
+            linewidth={1}
+            depthTest={true}
+            depthWrite={true}
+            transparent={false}
+            opacity={1}
           />
         </lineSegments>
       )}
@@ -113,6 +119,17 @@ export function PalletScene({
   showBoxOutlines,
   onHoverBox,
 }: Props) {
+  const palletVisualThickness = Math.max(pallet.height * 0.06, 12);
+  const palletSlatHeight = palletVisualThickness * 0.28;
+  const palletRunnerHeight = palletVisualThickness * 0.45;
+  const palletBaseHeight = palletVisualThickness * 0.27;
+  const palletSlatCenterY =
+    palletBaseHeight + palletRunnerHeight + palletSlatHeight / 2;
+  const palletTopSurfaceY =
+    palletBaseHeight + palletRunnerHeight + palletSlatHeight;
+  const palletRunnerY = palletBaseHeight + palletRunnerHeight / 2;
+  const palletBaseY = palletBaseHeight / 2;
+
   return (
     <div className="relative h-full overflow-hidden rounded-[2rem] border border-slate-800/80 bg-slate-950/80 shadow-soft">
       <Canvas
@@ -142,15 +159,47 @@ export function PalletScene({
           maxPolarAngle={1.35 * Math.PI}
         />
 
-        <mesh
-          rotation={[-Math.PI / 2, 0, 0]}
-          position={[pallet.width / 2, 0, pallet.depth / 2]}
-        />
+        <group position={[pallet.width / 2, 0, pallet.depth / 2]}>
+          {Array.from({ length: 5 }).map((_, index) => {
+            const gap = 1.0;
+            const slatDepth = (pallet.depth - gap * 4) / 5;
+            return (
+              <mesh
+                key={`slat-${index}`}
+                position={[
+                  0,
+                  palletSlatCenterY,
+                  -pallet.depth / 2 + slatDepth / 2 + index * (slatDepth + gap),
+                ]}
+              >
+                <boxGeometry
+                  args={[pallet.width, palletSlatHeight, slatDepth]}
+                />
+                <meshStandardMaterial
+                  color="#8B5E3C"
+                  roughness={0.7}
+                  metalness={0.1}
+                />
+              </mesh>
+            );
+          })}
 
-        <mesh position={[pallet.width / 2, -2.5, pallet.depth / 2]}>
-          <boxGeometry args={[pallet.width + 4, 5, pallet.depth + 4]} />
-          <meshStandardMaterial color="#C08A4B" />
-        </mesh>
+          {[-1, 0, 1].map((xMul) => (
+            <mesh
+              key={`runner-${xMul}`}
+              position={[xMul * (pallet.width / 3.2), palletRunnerY, 0]}
+            >
+              <boxGeometry
+                args={[pallet.width / 6, palletRunnerHeight, pallet.depth]}
+              />
+              <meshStandardMaterial
+                color="#6B4A2D"
+                roughness={0.78}
+                metalness={0.05}
+              />
+            </mesh>
+          ))}
+        </group>
 
         {boxes
           .filter(
@@ -164,6 +213,7 @@ export function PalletScene({
               box={box}
               showOutlines={showBoxOutlines ?? false}
               onHover={onHoverBox ?? (() => null)}
+              offsetY={palletTopSurfaceY}
             />
           ))}
       </Canvas>

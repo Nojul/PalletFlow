@@ -28,6 +28,16 @@ const presets: Array<{ label: string; config: PalletConfig }> = [
       unit: "cm",
     },
   },
+  {
+    label: "Post Canada pallet",
+    config: {
+      width: 121.9,
+      depth: 101.6,
+      height: 150,
+      maxWeight: 1600,
+      unit: "cm",
+    },
+  },
 ];
 
 export function PalletConfigPanel({ config, onChange }: Props) {

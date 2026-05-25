@@ -194,6 +194,7 @@ export default function HomePage() {
                   activeLayer={activeLayer}
                   showOnlyScannable={showScannableOnly}
                   showBoxOutlines={showBoxOutlines}
+                  highlightedBoxId={hovered}
                   onHoverBox={setHovered}
                 />
               </div>
