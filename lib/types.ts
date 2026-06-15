@@ -10,6 +10,11 @@ export type BoxTemplate = {
   irregularSegments?: Array<{ x: number; y: number; z: number; width: number; depth: number; height: number }>;
 };
 
+export type BoxPreset = Omit<
+  BoxTemplate,
+  "color" | "irregularSegments" | "quantity"
+>;
+
 export type PlacedBox = {
   id: string;
   boxId: string;

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { PalletConfig } from "@/lib/types";
 import {
   ArrowRight,
@@ -41,11 +41,34 @@ const presets: Array<{ label: string; config: PalletConfig }> = [
 ];
 
 export function PalletConfigPanel({ config, onChange }: Props) {
-  const update = (field: keyof PalletConfig, value: string | number) => {
-    onChange({
-      ...config,
-      [field]: typeof value === "string" ? Number(value) : value,
+  const normalizeNumberInput = (value: string) => {
+    if (value === "") return "";
+    if (value === "0") return "0";
+    if (value.startsWith("0") && !value.startsWith("0.")) {
+      const stripped = value.replace(/^0+/, "");
+      return stripped === "" ? "0" : stripped;
+    }
+    return value;
+  };
+
+  const [local, setLocal] = useState<Record<string, string>>({
+    width: String(config.width ?? ""),
+    depth: String(config.depth ?? ""),
+    height: String(config.height ?? ""),
+    maxWeight: String(config.maxWeight ?? ""),
+  });
+
+  useEffect(() => {
+    setLocal({
+      width: String(config.width ?? ""),
+      depth: String(config.depth ?? ""),
+      height: String(config.height ?? ""),
+      maxWeight: String(config.maxWeight ?? ""),
     });
+  }, [config.width, config.depth, config.height, config.maxWeight]);
+
+  const update = (field: keyof PalletConfig, value: number) => {
+    onChange({ ...config, [field]: value });
   };
 
   const [expanded, setExpanded] = useState(true);
@@ -85,20 +108,39 @@ export function PalletConfigPanel({ config, onChange }: Props) {
               { label: "Depth", field: "depth" },
               { label: "Height", field: "height" },
               { label: "Max weight", field: "maxWeight" },
-            ].map((item) => (
-              <label key={item.field} className="block text-sm text-slate-300">
-                <span className="mb-2 block text-slate-400">{item.label}</span>
-                <input
-                  type="number"
-                  value={config[item.field as keyof PalletConfig]}
-                  min={0}
-                  onChange={(event) =>
-                    update(item.field as keyof PalletConfig, event.target.value)
-                  }
-                  className="w-full rounded-2xl border border-slate-800 bg-slate-950/90 px-3 py-2 text-white outline-none transition focus:border-brand-400"
-                />
-              </label>
-            ))}
+            ].map((item) => {
+              const unit = item.field === "maxWeight" ? "kg" : "cm";
+              return (
+                <label
+                  key={item.field}
+                  className="block text-sm text-slate-300"
+                >
+                  <span className="mb-2 block text-slate-400">
+                    {item.label}
+                  </span>
+                  <div className="relative">
+                    <input
+                      type="number"
+                      value={local[item.field as string]}
+                      min={0}
+                      onChange={(event) => {
+                        const val = normalizeNumberInput(event.target.value);
+                        setLocal((cur) => ({ ...cur, [item.field]: val }));
+                      }}
+                      onBlur={() => {
+                        const raw = local[item.field as string];
+                        const parsed = raw === "" ? 0 : Number(raw);
+                        update(item.field as keyof PalletConfig, parsed);
+                      }}
+                      className="w-full rounded-2xl border border-slate-800 bg-slate-950/90 px-3 py-2 pr-12 text-white outline-none transition focus:border-brand-400"
+                    />
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-slate-400">
+                      {unit}
+                    </span>
+                  </div>
+                </label>
+              );
+            })}
           </div>
 
           <div className="space-y-2">
