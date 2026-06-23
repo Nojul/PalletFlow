@@ -21,7 +21,7 @@ const blankPreset = (): BoxPreset => ({
 const fields = [
   { label: "Name", key: "name", type: "text" },
   { label: "Width", key: "width", type: "number" },
-  { label: "Depth", key: "depth", type: "number" },
+  { label: "Length", key: "depth", type: "number" },
   { label: "Height", key: "height", type: "number" },
   { label: "Weight", key: "weight", type: "number" },
 ];
@@ -168,7 +168,7 @@ export function BoxPresetsManager({ presets }: Props) {
         </div>
       </section>
 
-      <section className="grid gap-5 lg:grid-cols-[minmax(280px,360px)_minmax(0,1fr)]">
+      <section className="grid gap-5 md:grid-cols-[minmax(280px,1fr)_minmax(0,1.8fr)] xl:grid-cols-[minmax(280px,360px)_minmax(0,1.8fr)]">
         <div className="space-y-5">
           <div className="rounded-3xl border border-slate-800/80 bg-slate-950/70 p-5 shadow-soft">
             <div className="flex items-center justify-between gap-3">

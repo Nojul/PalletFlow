@@ -160,7 +160,7 @@ export function BoxManager({ boxes, onChange, presets = [] }: Props) {
 
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 p-4">
-          <div className="w-full max-w-2xl rounded-[2rem] border border-slate-800/90 bg-slate-950/95 p-6 shadow-soft backdrop-blur-xl">
+          <div className="w-full max-w-2xl max-h-[calc(100vh-4rem)] overflow-y-auto rounded-[2rem] border border-slate-800/90 bg-slate-950/95 p-6 shadow-soft backdrop-blur-xl">
             <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
               <div>
                 <p className="text-sm uppercase tracking-[0.25em] text-brand-300/80">
@@ -256,7 +256,7 @@ export function BoxManager({ boxes, onChange, presets = [] }: Props) {
                   [
                     { label: "Name", field: "name", type: "text" },
                     { label: "Width", field: "width", type: "number" },
-                    { label: "Depth", field: "depth", type: "number" },
+                    { label: "Length", field: "depth", type: "number" },
                     { label: "Height", field: "height", type: "number" },
                     { label: "Weight", field: "weight", type: "number" },
                     { label: "Quantity", field: "quantity", type: "number" },
@@ -392,7 +392,7 @@ export function BoxManager({ boxes, onChange, presets = [] }: Props) {
                         {box.name}
                       </p>
                       <p className="text-xs text-slate-500">
-                        Volume: {box.width}×{box.depth}×{box.height}
+                        Size: {box.width}×{box.depth}×{box.height} cm
                       </p>
                     </div>
                   </div>
@@ -411,7 +411,7 @@ export function BoxManager({ boxes, onChange, presets = [] }: Props) {
                   {[
                     { label: "Name", field: "name", type: "text" },
                     { label: "Width", field: "width", type: "number" },
-                    { label: "Depth", field: "depth", type: "number" },
+                    { label: "Length", field: "depth", type: "number" },
                     { label: "Height", field: "height", type: "number" },
                     { label: "Weight", field: "weight", type: "number" },
                     { label: "Quantity", field: "quantity", type: "number" },

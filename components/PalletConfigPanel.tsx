@@ -16,13 +16,19 @@ type Props = {
 const presets: Array<{ label: string; config: PalletConfig }> = [
   {
     label: "EUR pallet",
-    config: { width: 120, depth: 80, height: 150, maxWeight: 1500, unit: "cm" },
+    config: {
+      width: 120,
+      depth: 80,
+      height: 150,
+      maxWeight: 1500,
+      unit: "cm",
+    },
   },
   {
     label: "US pallet",
     config: {
-      width: 122,
-      depth: 101,
+      width: 120,
+      depth: 100,
       height: 150,
       maxWeight: 1800,
       unit: "cm",
@@ -31,8 +37,8 @@ const presets: Array<{ label: string; config: PalletConfig }> = [
   {
     label: "Post Canada pallet",
     config: {
-      width: 121.9,
-      depth: 101.6,
+      width: 120,
+      depth: 100,
       height: 150,
       maxWeight: 1600,
       unit: "cm",
@@ -105,7 +111,7 @@ export function PalletConfigPanel({ config, onChange }: Props) {
           <div className="grid gap-2 sm:grid-cols-2">
             {[
               { label: "Width", field: "width" },
-              { label: "Depth", field: "depth" },
+              { label: "Length", field: "depth" },
               { label: "Height", field: "height" },
               { label: "Max weight", field: "maxWeight" },
             ].map((item) => {

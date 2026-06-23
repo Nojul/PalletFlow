@@ -1,21 +1,27 @@
 "use client";
 
-import { Box, LayoutGrid, Layers } from "lucide-react";
+import { Boxes, LayoutGrid, Layers, PackageOpen } from "lucide-react";
 
-type Section = "optimizer" | "presets";
+type Section = "optimizer" | "presets" | "packing";
 
 type Props = {
   activeSection: Section;
-  onSelectSection: (section: Section) => void;
 };
 
 const sections: Array<{ id: Section; label: string; icon: typeof LayoutGrid }> =
   [
     { id: "optimizer", label: "Optimizer", icon: Layers },
-    { id: "presets", label: "Box Presets", icon: Box },
+    { id: "presets", label: "Box Presets", icon: PackageOpen },
+    { id: "packing", label: "Packing", icon: Boxes },
   ];
 
-export function TopNavigation({ activeSection, onSelectSection }: Props) {
+export function TopNavigation({ activeSection }: Props) {
+  const handleSelect = (section: Section) => {
+    window.dispatchEvent(
+      new CustomEvent("palletflow:select-section", { detail: section }),
+    );
+  };
+
   return (
     <div className="sticky top-0 z-30 border-b border-slate-800/80 bg-slate-950/95 backdrop-blur-xl">
       <div className="mx-auto flex max-w-[1440px] flex-col gap-4 px-6 py-4 sm:flex-row sm:items-center sm:justify-between lg:px-10">
@@ -33,7 +39,7 @@ export function TopNavigation({ activeSection, onSelectSection }: Props) {
           </div>
         </div>
 
-        <nav className="flex flex-wrap items-center gap-2 rounded-3xl border border-slate-800/80 bg-slate-900/80 p-2">
+        <nav className="flex flex-wrap items-center justify-center gap-2 overflow-x-auto rounded-3xl border border-slate-800/80 bg-slate-900/80 p-2 text-sm sm:justify-end">
           {sections.map((section) => {
             const Icon = section.icon;
             const isActive = section.id === activeSection;
@@ -41,7 +47,7 @@ export function TopNavigation({ activeSection, onSelectSection }: Props) {
               <button
                 key={section.id}
                 type="button"
-                onClick={() => onSelectSection(section.id)}
+                onClick={() => handleSelect(section.id)}
                 className={`inline-flex items-center gap-2 rounded-3xl px-4 py-2 text-sm font-semibold transition ${
                   isActive
                     ? "bg-brand-500 text-white shadow-soft"

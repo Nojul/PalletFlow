@@ -43,9 +43,9 @@ export default function HomePage() {
   const [pallet, setPallet] = useState<PalletConfig>(defaultPallet);
   const [boxes, setBoxes] = useState<BoxTemplate[]>(defaultBoxes);
   const [presets, setPresets] = useState<BoxPreset[]>(defaultBoxPresets);
-  const [activeSection, setActiveSection] = useState<"optimizer" | "presets">(
-    "optimizer",
-  );
+  const [activeSection, setActiveSection] = useState<
+    "optimizer" | "presets" | "packing"
+  >("optimizer");
   const [placedBoxes, setPlacedBoxes] = useState(
     [] as Array<ReturnType<typeof buildPackingPlan>[number]>,
   );
@@ -72,6 +72,20 @@ export default function HomePage() {
     };
     window.addEventListener("presets:update", handler);
     return () => window.removeEventListener("presets:update", handler);
+  }, []);
+
+  useEffect(() => {
+    const handleNavigation = (event: Event) => {
+      const section = (event as CustomEvent<string>).detail as
+        | "optimizer"
+        | "presets"
+        | "packing";
+      setActiveSection(section);
+    };
+
+    window.addEventListener("palletflow:select-section", handleNavigation);
+    return () =>
+      window.removeEventListener("palletflow:select-section", handleNavigation);
   }, []);
 
   const levelOptions = useMemo(() => {
@@ -182,11 +196,8 @@ export default function HomePage() {
 
   return (
     <>
-      <TopNavigation
-        activeSection={activeSection}
-        onSelectSection={setActiveSection}
-      />
-      <main className="min-h-screen px-6 py-6 lg:px-10">
+      <TopNavigation activeSection={activeSection} />
+      <main className="min-h-screen px-4 py-5 sm:px-6 lg:px-10">
         {activeSection === "optimizer" ? (
           <div className="mx-auto max-w-[1440px] space-y-5">
             <header className="rounded-[2rem] border border-slate-800/80 bg-slate-950/70 p-6 shadow-soft backdrop-blur-xl">
@@ -195,7 +206,7 @@ export default function HomePage() {
                   <p className="text-sm uppercase tracking-[0.25em] text-brand-300/80">
                     PalletFlow
                   </p>
-                  <h1 className="max-w-9xl text-4xl font-semibold text-white sm:text-5xl">
+                  <h1 className="max-w-3xl text-4xl font-semibold text-white sm:text-5xl">
                     3D pallet packing optimizer built for modern logistics.
                   </h1>
                   <p className="max-w-2xl text-slate-400">
@@ -206,7 +217,7 @@ export default function HomePage() {
               </div>
             </header>
 
-            <div className="grid gap-5 xl:grid-cols-[minmax(260px,300px)_minmax(0,1.8fr)_minmax(220px,260px)]">
+            <div className="grid gap-5 lg:grid-cols-[minmax(260px,1fr)_minmax(0,1.8fr)_minmax(220px,1fr)] xl:grid-cols-[minmax(260px,320px)_minmax(0,1.8fr)_minmax(220px,320px)]">
               <div className="space-y-5">
                 <PalletConfigPanel config={pallet} onChange={setPallet} />
                 <BoxManager
@@ -218,7 +229,7 @@ export default function HomePage() {
 
               <div className="space-y-6">
                 <div className="rounded-[2rem] border border-slate-800/80 bg-slate-950/70 p-4 shadow-soft">
-                  <div className="h-[500px] min-h-[340px]">
+                  <div className="min-h-[320px] h-[min(55vh,520px)]">
                     <PalletScene
                       pallet={pallet}
                       boxes={displayedBoxes}
@@ -251,9 +262,9 @@ export default function HomePage() {
                         </p>
                         <p>
                           Size: {hoveredDetails.width}×{hoveredDetails.depth}×
-                          {hoveredDetails.height}
+                          {hoveredDetails.height} cm
                         </p>
-                        <p>Weight: {hoveredDetails.weight}kg</p>
+                        <p>Weight: {hoveredDetails.weight} kg</p>
                         <p>
                           Position: {hoveredDetails.x}, {hoveredDetails.y},{" "}
                           {hoveredDetails.z}

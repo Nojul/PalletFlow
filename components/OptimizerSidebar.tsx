@@ -136,9 +136,7 @@ export function OptimizerSidebar({
                 }`}
               >
                 <div className="font-semibold">{item.label}</div>
-                <div className="text-[11px] text-slate-500">
-                  {item.subtitle}
-                </div>
+                <div className="text-xs text-slate-500">{item.subtitle}</div>
               </button>
             ))}
           </div>

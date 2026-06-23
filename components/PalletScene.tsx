@@ -46,9 +46,7 @@ const BoxMesh = ({
       try {
         edges.dispose();
         geom.dispose();
-      } catch (e) {
-        /* ignore dispose errors */
-      }
+      } catch (e) {}
     };
   }, [edges, geom]);
 
@@ -120,15 +118,34 @@ export function PalletScene({
   onHoverBox,
 }: Props) {
   const palletVisualThickness = Math.max(pallet.height * 0.06, 12);
-  const palletSlatHeight = palletVisualThickness * 0.28;
-  const palletRunnerHeight = palletVisualThickness * 0.45;
-  const palletBaseHeight = palletVisualThickness * 0.27;
-  const palletSlatCenterY =
-    palletBaseHeight + palletRunnerHeight + palletSlatHeight / 2;
-  const palletTopSurfaceY =
-    palletBaseHeight + palletRunnerHeight + palletSlatHeight;
-  const palletRunnerY = palletBaseHeight + palletRunnerHeight / 2;
-  const palletBaseY = palletBaseHeight / 2;
+  const boardHeight = palletVisualThickness * 0.32;
+  const blockHeight = palletVisualThickness * 0.58;
+  const gap = 1.5;
+
+  // Vertical stacking: bottom → blocks → top
+  const bottomPlanksY = boardHeight / 2;
+  const blockY = boardHeight + blockHeight / 2;
+  const topBoardY = boardHeight + blockHeight + boardHeight / 2;
+  const palletTopSurfaceY = boardHeight + blockHeight + boardHeight;
+
+  // Material definitions for layer debugging (temporary colors)
+  const topMaterial = {
+    color: "#8B5E3C", // Light honey wood
+    roughness: 0.75,
+    metalness: 0.05,
+  };
+
+  const blockMaterial = {
+    color: "#6B4A2D",
+    roughness: 0.75,
+    metalness: 0.05,
+  };
+
+  const bottomMaterial = {
+    color: "#6B4A2D", // Darker brown
+    roughness: 0.75,
+    metalness: 0.05,
+  };
 
   return (
     <div className="relative h-full overflow-hidden rounded-[2rem] border border-slate-800/80 bg-slate-950/80 shadow-soft">
@@ -160,47 +177,68 @@ export function PalletScene({
         />
 
         <group position={[pallet.width / 2, 0, pallet.depth / 2]}>
+          {/* TOP BOARDS: 5 boards running across width */}
           {Array.from({ length: 5 }).map((_, index) => {
-            const gap = 1.0;
-            const slatDepth = (pallet.depth - gap * 4) / 5;
+            const boardDepth = (pallet.depth - gap * 4) / 5;
+            const zPos =
+              -pallet.depth / 2 + boardDepth / 2 + index * (boardDepth + gap);
             return (
-              <mesh
-                key={`slat-${index}`}
-                position={[
-                  0,
-                  palletSlatCenterY,
-                  -pallet.depth / 2 + slatDepth / 2 + index * (slatDepth + gap),
-                ]}
-              >
-                <boxGeometry
-                  args={[pallet.width, palletSlatHeight, slatDepth]}
-                />
-                <meshStandardMaterial
-                  color="#8B5E3C"
-                  roughness={0.7}
-                  metalness={0.1}
-                />
+              <mesh key={`top-${index}`} position={[0, topBoardY, zPos]}>
+                <boxGeometry args={[pallet.width, boardHeight, boardDepth]} />
+                <meshStandardMaterial {...topMaterial} />
               </mesh>
             );
           })}
 
-          {[-1, 0, 1].map((xMul) => (
-            <mesh
-              key={`runner-${xMul}`}
-              position={[xMul * (pallet.width / 3.2), palletRunnerY, 0]}
-            >
-              <boxGeometry
-                args={[pallet.width / 6, palletRunnerHeight, pallet.depth]}
-              />
-              <meshStandardMaterial
-                color="#6B4A2D"
-                roughness={0.78}
-                metalness={0.05}
-              />
-            </mesh>
-          ))}
+          {/* SUPPORT BLOCKS: 3×3 grid (9 blocks total) - flush with edges */}
+          {Array.from({ length: 3 }).map((_, xi) =>
+            Array.from({ length: 3 }).map((_, zi) => {
+              const blockSize = Math.min(pallet.width, pallet.depth) * 0.14;
+
+              // Calculate positions so outer blocks are flush with pallet edges
+              let xPos;
+              if (xi === 0) xPos = -pallet.width / 2 + blockSize / 2;
+              else if (xi === 2) xPos = pallet.width / 2 - blockSize / 2;
+              else xPos = 0;
+
+              let zPos;
+              if (zi === 0) zPos = -pallet.depth / 2 + blockSize / 2;
+              else if (zi === 2) zPos = pallet.depth / 2 - blockSize / 2;
+              else zPos = 0;
+
+              return (
+                <mesh
+                  key={`support-block-${xi}-${zi}`}
+                  position={[xPos, blockY, zPos]}
+                >
+                  <boxGeometry args={[blockSize, blockHeight, blockSize]} />
+                  <meshStandardMaterial {...blockMaterial} />
+                </mesh>
+              );
+            }),
+          )}
+
+          {/* BOTTOM LAYER: 3 planks positioned under the 3 block rows */}
+          {Array.from({ length: 3 }).map((_, zi) => {
+            const blockSize = Math.min(pallet.width, pallet.depth) * 0.14;
+            const boardDepth = blockSize;
+
+            // Match the Z positions of block rows
+            let zPos;
+            if (zi === 0) zPos = -pallet.depth / 2 + blockSize / 2;
+            else if (zi === 2) zPos = pallet.depth / 2 - blockSize / 2;
+            else zPos = 0;
+
+            return (
+              <mesh key={`bottom-${zi}`} position={[0, bottomPlanksY, zPos]}>
+                <boxGeometry args={[pallet.width, boardHeight, boardDepth]} />
+                <meshStandardMaterial {...bottomMaterial} />
+              </mesh>
+            );
+          })}
         </group>
 
+        {/* PACKED BOXES ON TOP */}
         {boxes
           .filter(
             (box) =>

@@ -42,7 +42,7 @@ export function TopDownView({
 
   return (
     <div className="rounded-3xl border border-slate-800/80 bg-slate-950/80 p-4 shadow-soft">
-      <div className="mb-4 flex items-center justify-between">
+      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <p className="text-sm font-semibold text-slate-100">
             2D top-down view
@@ -75,7 +75,7 @@ export function TopDownView({
       </div>
       <div className="flex justify-center">
         <div
-          className="relative w-full max-w-[500px] overflow-hidden rounded-2xl border border-slate-700 bg-slate-950/90"
+          className="relative w-full max-w-[min(500px,100%)] overflow-hidden rounded-2xl border border-slate-700 bg-slate-950/90"
           style={{
             aspectRatio: "1 / 1",
             backgroundSize: "24px 24px",
@@ -128,7 +128,7 @@ export function TopDownView({
                 onMouseLeave={() => handleHover(null)}
               >
                 <div
-                  className="truncate px-1 py-0.5 text-[9px]"
+                  className="truncate px-1 py-0.5 text-xs"
                   style={{
                     transform: `rotate(-${rotation}deg)`,
                     transformOrigin: "center",
