@@ -55,8 +55,8 @@ export default function HomePage() {
   const [hovered, setHovered] = useState<string | null>(null);
   const [showScannableOnly, setShowScannableOnly] = useState(false);
   const [useScannableOptimization, setUseScannableOptimization] =
-    useState(false);
-  const [showBoxOutlines, setShowBoxOutlines] = useState(false);
+    useState(true);
+  const [showBoxOutlines, setShowBoxOutlines] = useState(true);
   const [isOptimizing, setIsOptimizing] = useState(false);
 
   useEffect(() => {
