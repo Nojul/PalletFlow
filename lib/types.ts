@@ -46,10 +46,14 @@ export type PlacedBox = {
   invalid?: boolean;
 };
 
+export type PackingAlgorithm = "greedy" | "layered";
+
 export type PalletConfig = {
   width: number;
   depth: number;
   height: number;
   maxWeight: number;
   unit: 'cm' | 'in';
+  packingAlgorithm?: PackingAlgorithm;
+  edgeOverflowTolerance?: number;
 };

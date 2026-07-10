@@ -1,10 +1,21 @@
-import { BoxTemplate, PalletConfig, PlacedBox } from './types';
+import { BoxTemplate, PalletConfig, PlacedBox } from "./types";
 
 const createId = () => Math.random().toString(36).slice(2, 10);
 
-export function getVolume(width: number, depth: number, height: number) {
-  return width * depth * height;
-}
+type PackingAlgorithm = "greedy" | "layered";
+
+type PlacementItem = {
+  id: string;
+  boxId: string;
+  name: string;
+  weight: number;
+  color: string;
+  width: number;
+  depth: number;
+  height: number;
+  volume: number;
+  segments?: BoxTemplate["irregularSegments"];
+};
 
 type OrientationVariant = {
   width: number;
@@ -14,7 +25,34 @@ type OrientationVariant = {
   rotationY: 0 | 90;
 };
 
-function getOrientation(item: { width: number; depth: number; height: number }, rotationX: 0 | 90, rotationY: 0 | 90): OrientationVariant {
+type PlacementCandidate = {
+  candidate: PlacedBox;
+  score: number;
+  coords: { x: number; y: number; z: number };
+};
+
+type FoundationPlanEntry = {
+  template: BoxTemplate;
+  requiredOnFirstLayer: number;
+  maxStackHeight: number;
+  remaining: number;
+};
+
+type PackingOptions = {
+  scannableOptimization?: boolean;
+  algorithm?: PackingAlgorithm;
+  requireAccessibility?: boolean;
+};
+
+export function getVolume(width: number, depth: number, height: number) {
+  return width * depth * height;
+}
+
+function getOrientation(
+  item: { width: number; depth: number; height: number },
+  rotationX: 0 | 90,
+  rotationY: 0 | 90,
+): OrientationVariant {
   let width = item.width;
   let depth = item.depth;
   let height = item.height;
@@ -30,158 +68,47 @@ function getOrientation(item: { width: number; depth: number; height: number }, 
   return { width, depth, height, rotationX, rotationY };
 }
 
-function collide(a: PlacedBox, b: PlacedBox) {
-  return (
-    a.x < b.x + b.width &&
-    a.x + a.width > b.x &&
-    a.y < b.y + b.depth &&
-    a.y + a.depth > b.y &&
-    a.z < b.z + b.height &&
-    a.z + a.height > b.z
-  );
-}
+function getAllOrientationVariants(item: {
+  width: number;
+  depth: number;
+  height: number;
+}): OrientationVariant[] {
+  const baseDimensions = [item.width, item.depth, item.height];
+  const variants = new Map<string, OrientationVariant>();
 
-function fitsInside(pallet: PalletConfig, box: { width: number; depth: number; height: number }, position: { x: number; y: number; z: number }) {
-  return (
-    position.x + box.width <= pallet.width + 1e-6 &&
-    position.y + box.depth <= pallet.depth + 1e-6 &&
-    position.z + box.height <= pallet.height + 1e-6
-  );
-}
+  const permutations = [
+    [0, 1, 2],
+    [0, 2, 1],
+    [1, 0, 2],
+    [1, 2, 0],
+    [2, 0, 1],
+    [2, 1, 0],
+  ];
 
-type VisibilityStatus = "side-visible" | "top-only" | "hidden";
-
-type VisibleSides = {
-  left: boolean;
-  right: boolean;
-  front: boolean;
-  back: boolean;
-};
-
-type PackingOptions = {
-  scannableOptimization?: boolean;
-};
-
-const DEFAULT_MIN_SUPPORT = 0.7; // 70% of base area must be supported by pallet or boxes below
-
-
-const isFlush = (value: number, target: number) => Math.abs(value - target) < 1e-6;
-
-const overlaps = (
-  startA: number,
-  endA: number,
-  startB: number,
-  endB: number,
-) => startA < endB && endA > startB;
-
-function getVisibleSides(
-  pallet: PalletConfig,
-  box: PlacedBox,
-  placedBoxes: PlacedBox[],
-) {
-  const otherBoxes = placedBoxes.filter((item) => item.id !== box.id);
-  const x0 = box.x;
-  const x1 = box.x + box.width;
-  const y0 = box.y;
-  const y1 = box.y + box.depth;
-  const z0 = box.z;
-  const z1 = box.z + box.height;
-
-  const left = !otherBoxes.some(
-    (other) =>
-      overlaps(other.y, other.y + other.depth, y0, y1) &&
-      overlaps(other.z, other.z + other.height, z0, z1) &&
-      other.x < x0 &&
-      other.x + other.width > 0,
-  );
-
-  const right = !otherBoxes.some(
-    (other) =>
-      overlaps(other.y, other.y + other.depth, y0, y1) &&
-      overlaps(other.z, other.z + other.height, z0, z1) &&
-      other.x < pallet.width &&
-      other.x + other.width > x1,
-  );
-
-  const front = !otherBoxes.some(
-    (other) =>
-      overlaps(other.x, other.x + other.width, x0, x1) &&
-      overlaps(other.z, other.z + other.height, z0, z1) &&
-      other.y < y0 &&
-      other.y + other.depth > 0,
-  );
-
-  const back = !otherBoxes.some(
-    (other) =>
-      overlaps(other.x, other.x + other.width, x0, x1) &&
-      overlaps(other.z, other.z + other.height, z0, z1) &&
-      other.y < pallet.depth &&
-      other.y + other.depth > y1,
-  );
-
-  return {
-    left,
-    right,
-    front,
-    back,
-  };
-}
-
-function annotateVisibility(pallet: PalletConfig, boxes: PlacedBox[]) {
-  return boxes.map((box) => {
-    const visibleSides = getVisibleSides(pallet, box, boxes);
-    const sideVisible =
-      visibleSides.left ||
-      visibleSides.right ||
-      visibleSides.front ||
-      visibleSides.back;
-    const topVisible =
-      !boxes.some(
-        (other) =>
-          other.id !== box.id &&
-          overlaps(other.x, other.x + other.width, box.x, box.x + box.width) &&
-          overlaps(other.y, other.y + other.depth, box.y, box.y + box.depth) &&
-          other.z < pallet.height &&
-          other.z + other.height > box.z + box.height,
-      );
-    const visibilityStatus: VisibilityStatus = sideVisible
-      ? "side-visible"
-      : topVisible
-      ? "top-only"
-      : "hidden";
-
-    return {
-      ...box,
-      visibleSides,
-      sideVisible,
-      topVisible,
-      visibilityStatus,
-      scannable: sideVisible || topVisible,
-      invalid: (box.invalid ?? false) || visibilityStatus === "hidden",
+  permutations.forEach((order) => {
+    const [first, second, third] = order;
+    const width = baseDimensions[first];
+    const depth = baseDimensions[second];
+    const height = baseDimensions[third];
+    const variant: OrientationVariant = {
+      width,
+      depth,
+      height,
+      rotationX: third === 2 ? 0 : 90,
+      rotationY: first === 1 ? 90 : 0,
     };
+
+    const key = `${variant.width}:${variant.depth}:${variant.height}`;
+    if (!variants.has(key)) {
+      variants.set(key, variant);
+    }
   });
+
+  return Array.from(variants.values());
 }
 
-function scorePlacement(
-  candidate: PlacedBox,
-  placed: PlacedBox[],
-  pallet: PalletConfig,
-) {
-  const allBoxes = annotateVisibility(pallet, [...placed, candidate]);
-  return allBoxes.reduce((score, item) => {
-    if (item.visibilityStatus === "side-visible") return score + 100;
-    if (item.visibilityStatus === "top-only") return score + 20;
-    return score - 200;
-  }, 0);
-}
-
-export function buildPackingPlan(
-  pallet: PalletConfig,
-  boxes: BoxTemplate[],
-  options: PackingOptions = {},
-) {
-  const minSupportFraction = Math.max(0, Math.min(1, (options as any).minSupportFraction ?? DEFAULT_MIN_SUPPORT));
-  const items = boxes.flatMap((template) => {
+function createPlacementItems(boxes: BoxTemplate[]) {
+  return boxes.flatMap((template) => {
     const width = Number(template.width);
     const depth = Number(template.depth);
     const height = Number(template.height);
@@ -201,107 +128,776 @@ export function buildPackingPlan(
       segments: template.irregularSegments,
     }));
   });
+}
 
-  items.sort((a, b) => b.volume - a.volume || b.height - a.height);
+function collide(a: PlacedBox, b: PlacedBox) {
+  return (
+    a.x < b.x + b.width &&
+    a.x + a.width > b.x &&
+    a.y < b.y + b.depth &&
+    a.y + a.depth > b.y &&
+    a.z < b.z + b.height &&
+    a.z + a.height > b.z
+  );
+}
 
-  const placed: PlacedBox[] = [];
-
-  const zPositions = [0];
-
-  const expandPositions = () => {
-    const positions = new Set<number>();
-    positions.add(0);
-    placed.forEach((item) => positions.add(item.z + item.height));
-    return Array.from(positions).sort((a, b) => a - b);
+function getEffectivePalletBounds(
+  pallet: PalletConfig,
+  allowOverflow: boolean,
+) {
+  const tolerance = allowOverflow
+    ? Math.max(0, pallet.edgeOverflowTolerance ?? 0)
+    : 0;
+  return {
+    width: pallet.width + tolerance,
+    depth: pallet.depth + tolerance,
   };
+}
 
-  const tryPlace = (item: typeof items[number]) => {
-    const orientationVariants: OrientationVariant[] = [
-      getOrientation(item, 0, 0),
-      getOrientation(item, 0, 90),
-      getOrientation(item, 90, 0),
-      getOrientation(item, 90, 90),
+function fitsInside(
+  pallet: PalletConfig,
+  box: { width: number; depth: number; height: number },
+  position: { x: number; y: number; z: number },
+) {
+  const tolerance = Math.max(0, pallet.edgeOverflowTolerance ?? 0);
+  return (
+    position.x + box.width <= pallet.width + tolerance + 1e-6 &&
+    position.y + box.depth <= pallet.depth + tolerance + 1e-6 &&
+    position.z + box.height <= pallet.height + 1e-6
+  );
+}
+
+type VisibilityStatus = "side-visible" | "top-only" | "hidden";
+
+const DEFAULT_MIN_SUPPORT = 0.7; // 70% of base area must be supported by pallet or boxes below
+const MAX_CANDIDATES_PER_PLACEMENT = 24;
+const MAX_FIRST_LAYER_CANDIDATES = 12;
+const MAX_FIRST_LAYER_SEARCH_NODES = 800;
+const PLACEMENT_TIME_BUDGET_MS = 1800;
+const SCANNABLE_TIME_BUDGET_MS = 4000;
+
+const overlaps = (startA: number, endA: number, startB: number, endB: number) =>
+  startA < endB && endA > startB;
+
+function isFaceFullyExposed(
+  pallet: PalletConfig,
+  box: PlacedBox,
+  placedBoxes: PlacedBox[],
+  side: "left" | "right" | "front" | "back",
+) {
+  const eps = 1e-6;
+  const otherBoxes = placedBoxes.filter((item) => item.id !== box.id);
+  const x0 = box.x;
+  const x1 = box.x + box.width;
+  const y0 = box.y;
+  const y1 = box.y + box.depth;
+  const z0 = box.z;
+  const z1 = box.z + box.height;
+
+  const spansHeight = (other: PlacedBox) =>
+    overlaps(other.z, other.z + other.height, z0, z1);
+  const spansWidth = (other: PlacedBox) =>
+    overlaps(other.x, other.x + other.width, x0, x1);
+  const spansDepth = (other: PlacedBox) =>
+    overlaps(other.y, other.y + other.depth, y0, y1);
+
+  switch (side) {
+    case "left":
+      if (x0 <= eps) return true;
+      return !otherBoxes.some(
+        (other) =>
+          spansHeight(other) &&
+          spansDepth(other) &&
+          other.x + other.width >= x0 - eps &&
+          other.x < x0,
+      );
+    case "right":
+      if (x1 >= pallet.width - eps) return true;
+      return !otherBoxes.some(
+        (other) =>
+          spansHeight(other) &&
+          spansDepth(other) &&
+          other.x <= x1 + eps &&
+          other.x + other.width > x1,
+      );
+    case "front":
+      if (y0 <= eps) return true;
+      return !otherBoxes.some(
+        (other) =>
+          spansHeight(other) &&
+          spansWidth(other) &&
+          other.y + other.depth >= y0 - eps &&
+          other.y < y0,
+      );
+    case "back":
+      if (y1 >= pallet.depth - eps) return true;
+      return !otherBoxes.some(
+        (other) =>
+          spansHeight(other) &&
+          spansWidth(other) &&
+          other.y <= y1 + eps &&
+          other.y + other.depth > y1,
+      );
+    default:
+      return false;
+  }
+}
+function getVisibleSides(
+  pallet: PalletConfig,
+  box: PlacedBox,
+  placedBoxes: PlacedBox[],
+) {
+  return {
+    left: isFaceFullyExposed(pallet, box, placedBoxes, "left"),
+    right: isFaceFullyExposed(pallet, box, placedBoxes, "right"),
+    front: isFaceFullyExposed(pallet, box, placedBoxes, "front"),
+    back: isFaceFullyExposed(pallet, box, placedBoxes, "back"),
+  };
+}
+
+function annotateVisibility(pallet: PalletConfig, boxes: PlacedBox[]) {
+  return boxes.map((box) => {
+    const visibleSides = getVisibleSides(pallet, box, boxes);
+    const sideVisible =
+      visibleSides.left ||
+      visibleSides.right ||
+      visibleSides.front ||
+      visibleSides.back;
+    const topVisible = !boxes.some(
+      (other) =>
+        other.id !== box.id &&
+        overlaps(other.x, other.x + other.width, box.x, box.x + box.width) &&
+        overlaps(other.y, other.y + other.depth, box.y, box.y + box.depth) &&
+        other.z < pallet.height &&
+        other.z + other.height > box.z + box.height,
+    );
+    const visibilityStatus: VisibilityStatus = sideVisible
+      ? "side-visible"
+      : topVisible
+        ? "top-only"
+        : "hidden";
+
+    return {
+      ...box,
+      visibleSides,
+      sideVisible,
+      topVisible,
+      visibilityStatus,
+      scannable: sideVisible,
+      invalid: !sideVisible,
+    };
+  });
+}
+
+function scorePlacement(
+  candidate: PlacedBox,
+  placed: PlacedBox[],
+  pallet: PalletConfig,
+) {
+  const allBoxes = annotateVisibility(pallet, [...placed, candidate]);
+  return allBoxes.reduce((score, item) => {
+    if (item.visibilityStatus === "side-visible") return score + 100;
+    if (item.visibilityStatus === "top-only") return score + 20;
+    return score - 200;
+  }, 0);
+}
+
+function getOrientationVariants(item: PlacementItem): OrientationVariant[] {
+  return getAllOrientationVariants(item);
+}
+
+function hasExternalVisibleSide(
+  pallet: PalletConfig,
+  box: PlacedBox,
+  placedBoxes: PlacedBox[],
+) {
+  const visibleSides = getVisibleSides(pallet, box, placedBoxes);
+  return (
+    visibleSides.left ||
+    visibleSides.right ||
+    visibleSides.front ||
+    visibleSides.back
+  );
+}
+
+function isFloorLayoutAccessible(
+  pallet: PalletConfig,
+  placedBoxes: PlacedBox[],
+) {
+  const floorBoxes = placedBoxes.filter((item) => Math.abs(item.z) < 1e-6);
+  if (floorBoxes.length === 0) return true;
+
+  return floorBoxes.every((box) =>
+    hasExternalVisibleSide(pallet, box, floorBoxes),
+  );
+}
+
+function getPlacementScore(
+  candidate: PlacedBox,
+  placed: PlacedBox[],
+  pallet: PalletConfig,
+  options: PackingOptions,
+  floorOnly: boolean,
+  allowOverflow: boolean,
+) {
+  if (options.scannableOptimization) {
+    return scorePlacement(candidate, placed, pallet);
+  }
+
+  if (floorOnly) {
+    const floorBoxes = [
+      ...placed.filter((item) => Math.abs(item.z) < 1e-6),
+      candidate,
     ];
+    const bounds = getEffectivePalletBounds(pallet, allowOverflow);
+    const usedArea = floorBoxes.reduce(
+      (sum, item) => sum + item.width * item.depth,
+      0,
+    );
+    const minX = Math.min(...floorBoxes.map((item) => item.x));
+    const maxX = Math.max(...floorBoxes.map((item) => item.x + item.width));
+    const minY = Math.min(...floorBoxes.map((item) => item.y));
+    const maxY = Math.max(...floorBoxes.map((item) => item.y + item.depth));
+    const boundingArea = Math.max(1e-6, (maxX - minX) * (maxY - minY));
+    const slackRight = Math.max(0, bounds.width - maxX);
+    const slackBottom = Math.max(0, bounds.depth - maxY);
+    const coverageRatio =
+      usedArea / Math.max(1e-6, bounds.width * bounds.depth);
+    const accessibleBoxes = floorBoxes.filter((box) =>
+      hasExternalVisibleSide(pallet, box, floorBoxes),
+    ).length;
+    const exposedSides = floorBoxes.reduce((sum, box) => {
+      const visibleSides = getVisibleSides(pallet, box, floorBoxes);
+      return (
+        sum +
+        Number(visibleSides.left) +
+        Number(visibleSides.right) +
+        Number(visibleSides.front) +
+        Number(visibleSides.back)
+      );
+    }, 0);
+    const accessibilityBonus = accessibleBoxes * 50000 + exposedSides * 2500;
+    const accessibilityPenalty =
+      Math.max(0, floorBoxes.length - accessibleBoxes) * 1000000;
+    return (
+      coverageRatio * 1000000 -
+      boundingArea * 0.25 -
+      slackRight * 120 -
+      slackBottom * 120 +
+      accessibilityBonus -
+      accessibilityPenalty
+    );
+  }
 
-    const zCandidates = expandPositions();
-    const scoredCandidates: Array<{
-      candidate: PlacedBox;
-      score: number;
-      coords: { x: number; y: number; z: number };
-    }> = [];
+  return (
+    (candidate.z === 0 ? 1000000 : 0) -
+    candidate.z * 100 -
+    candidate.x -
+    candidate.y
+  );
+}
 
-    for (const z of zCandidates) {
-      for (const variant of orientationVariants) {
-        for (let x = 0; x <= pallet.width - variant.width; x += 2) {
-          for (let y = 0; y <= pallet.depth - variant.depth; y += 2) {
-            const candidate = {
-              id: createId(),
-              boxId: item.boxId,
-              name: item.name,
-              originalWidth: item.width,
-              originalDepth: item.depth,
-              originalHeight: item.height,
-              width: variant.width,
-              depth: variant.depth,
-              height: variant.height,
-              weight: item.weight,
-              color: item.color,
-              x,
-              y,
-              z,
-              rotationX: variant.rotationX,
-              rotationY: variant.rotationY,
-              layer: z === 0 ? 0 : z,
-            };
+function expandPositions(placed: PlacedBox[]) {
+  const positions = new Set<number>();
+  positions.add(0);
+  placed.forEach((item) => positions.add(item.z + item.height));
+  return Array.from(positions).sort((a, b) => a - b);
+}
 
-            if (!fitsInside(pallet, candidate, candidate)) continue;
-            const collisions = placed.some((placedItem) => collide(candidate, placedItem));
-            if (collisions) continue;
+function findPlacementCandidates(
+  item: PlacementItem,
+  placed: PlacedBox[],
+  pallet: PalletConfig,
+  minSupportFraction: number,
+  options: PackingOptions,
+  zCandidates: number[],
+  floorOnly: boolean,
+  allowOverflow: boolean,
+  requireAccessibility: boolean,
+) {
+  const orientationVariants = getOrientationVariants(item);
+  const scoredCandidates: PlacementCandidate[] = [];
+  const bounds = getEffectivePalletBounds(pallet, allowOverflow);
+  const deadline =
+    Date.now() +
+    (options.scannableOptimization
+      ? SCANNABLE_TIME_BUDGET_MS
+      : PLACEMENT_TIME_BUDGET_MS);
+  const step = options.scannableOptimization
+    ? Math.max(
+        2,
+        Math.min(3, Math.round(Math.min(item.width, item.depth) / 24)),
+      )
+    : Math.max(
+        4,
+        Math.min(6, Math.round(Math.min(item.width, item.depth) / 20)),
+      );
+  const maxCandidates = options.scannableOptimization
+    ? MAX_CANDIDATES_PER_PLACEMENT + 8
+    : MAX_CANDIDATES_PER_PLACEMENT;
 
-            // Stability/support check: compute fraction of base area supported at this z
-            const supportFraction = computeSupportFraction(candidate, placed, pallet);
-            if (supportFraction < minSupportFraction) continue;
+  for (const z of zCandidates) {
+    for (const variant of orientationVariants) {
+      for (let x = 0; x <= bounds.width - variant.width + 1e-6; x += step) {
+        for (let y = 0; y <= bounds.depth - variant.depth + 1e-6; y += step) {
+          if (Date.now() > deadline) {
+            return scoredCandidates;
+          }
 
-            if (options.scannableOptimization) {
-              scoredCandidates.push({
-                candidate,
-                score: scorePlacement(candidate, placed, pallet),
-                coords: { x, y, z },
-              });
-            } else {
-              placed.push(candidate);
-              // stabilize after placing
-              stabilizePlaced(placed, pallet, minSupportFraction);
-              return true;
-            }
+          const candidate = {
+            id: createId(),
+            boxId: item.boxId,
+            name: item.name,
+            originalWidth: item.width,
+            originalDepth: item.depth,
+            originalHeight: item.height,
+            width: variant.width,
+            depth: variant.depth,
+            height: variant.height,
+            weight: item.weight,
+            color: item.color,
+            x,
+            y,
+            z,
+            rotationX: variant.rotationX,
+            rotationY: variant.rotationY,
+            layer: z === 0 ? 0 : z,
+          };
+
+          if (!fitsInside(pallet, candidate, candidate)) continue;
+          const collisions = placed.some((placedItem) =>
+            collide(candidate, placedItem),
+          );
+          if (collisions) continue;
+
+          const supportFraction = computeSupportFraction(
+            candidate,
+            placed,
+            pallet,
+          );
+          if (supportFraction < minSupportFraction) continue;
+
+          if (
+            requireAccessibility &&
+            floorOnly &&
+            !isFloorLayoutAccessible(pallet, [...placed, candidate])
+          ) {
+            continue;
+          }
+
+          scoredCandidates.push({
+            candidate,
+            score: getPlacementScore(
+              candidate,
+              placed,
+              pallet,
+              options,
+              floorOnly,
+              allowOverflow,
+            ),
+            coords: { x, y, z },
+          });
+
+          if (scoredCandidates.length >= maxCandidates) {
+            return scoredCandidates;
           }
         }
       }
     }
+  }
 
-    if (scoredCandidates.length > 0) {
-      scoredCandidates.sort((a, b) =>
-        b.score - a.score ||
-        a.coords.z - b.coords.z ||
-        a.coords.x - b.coords.x ||
-        a.coords.y - b.coords.y,
+  return scoredCandidates;
+}
+
+function findBestPlacement(
+  item: PlacementItem,
+  placed: PlacedBox[],
+  pallet: PalletConfig,
+  minSupportFraction: number,
+  options: PackingOptions,
+  floorOnly: boolean,
+  allowOverflow: boolean,
+  requireAccessibility: boolean,
+) {
+  const scoredCandidates = findPlacementCandidates(
+    item,
+    placed,
+    pallet,
+    minSupportFraction,
+    options,
+    floorOnly ? [0] : expandPositions(placed),
+    floorOnly,
+    allowOverflow,
+    requireAccessibility,
+  );
+
+  if (scoredCandidates.length === 0) return null;
+
+  scoredCandidates.sort(
+    (a, b) =>
+      b.score - a.score ||
+      a.coords.z - b.coords.z ||
+      a.coords.x - b.coords.x ||
+      a.coords.y - b.coords.y,
+  );
+
+  return scoredCandidates[0];
+}
+
+function createFoundationPlan(boxes: BoxTemplate[], pallet: PalletConfig) {
+  return boxes
+    .map((template) => {
+      const quantity = Math.max(0, Number(template.quantity) || 0);
+      const height = Number(template.height);
+      const maxStackHeight = Math.max(
+        1,
+        Math.floor(pallet.height / Math.max(1, height)),
       );
-      placed.push(scoredCandidates[0].candidate);
-      // After placing, stabilize stack (snap down unsupported boxes where possible)
-      stabilizePlaced(placed, pallet, minSupportFraction);
-      return true;
-    }
+      const requiredOnFirstLayer = Math.max(
+        1,
+        Math.min(quantity, Math.ceil(quantity / maxStackHeight)),
+      );
 
-    return false;
+      return {
+        template,
+        requiredOnFirstLayer,
+        maxStackHeight,
+        remaining: quantity,
+      } satisfies FoundationPlanEntry;
+    })
+    .filter((entry) => entry.remaining > 0);
+}
+
+function findVerticalPlacement(
+  item: PlacementItem,
+  placed: PlacedBox[],
+  pallet: PalletConfig,
+  baseBox: PlacedBox,
+  minSupportFraction: number,
+) {
+  const candidate = {
+    ...baseBox,
+    id: createId(),
+    boxId: item.boxId,
+    name: item.name,
+    originalWidth: item.width,
+    originalDepth: item.depth,
+    originalHeight: item.height,
+    x: baseBox.x,
+    y: baseBox.y,
+    z: baseBox.z + baseBox.height,
+    layer: baseBox.z + baseBox.height,
   };
 
-  items.forEach((item) => tryPlace(item));
+  if (!fitsInside(pallet, candidate, candidate)) return null;
+  if (placed.some((placedItem) => collide(candidate, placedItem))) return null;
 
-  return annotateVisibility(pallet, placed);
+  const supportFraction = computeSupportFraction(candidate, placed, pallet);
+  if (supportFraction < minSupportFraction) return null;
+
+  return {
+    candidate,
+    score: 0,
+    coords: { x: candidate.x, y: candidate.y, z: candidate.z },
+  };
+}
+
+function assignStackLevels(placed: PlacedBox[]) {
+  const boxes = placed.map((box) => ({ ...box }));
+  const layers = new Map<string, number>();
+
+  const sorted = [...boxes].sort((a, b) => a.z - b.z || a.y - b.y || a.x - b.x);
+  for (const box of sorted) {
+    if (Math.abs(box.z) < 1e-6) {
+      layers.set(box.id, 0);
+      continue;
+    }
+
+    const supporting = boxes.filter((other) => {
+      if (other.id === box.id) return false;
+      if (Math.abs(other.z + other.height - box.z) > 1e-6) return false;
+      const overlapX = Math.max(
+        0,
+        Math.min(other.x + other.width, box.x + box.width) -
+          Math.max(other.x, box.x),
+      );
+      const overlapY = Math.max(
+        0,
+        Math.min(other.y + other.depth, box.y + box.depth) -
+          Math.max(other.y, box.y),
+      );
+      return overlapX > 1e-6 && overlapY > 1e-6;
+    });
+
+    const parentLevel = supporting.reduce((maxLevel, other) => {
+      const level = layers.get(other.id) ?? 0;
+      return Math.max(maxLevel, level);
+    }, 0);
+
+    layers.set(box.id, parentLevel + 1);
+  }
+
+  return boxes.map((box) => ({
+    ...box,
+    layer: layers.get(box.id) ?? 0,
+  }));
+}
+
+function buildAccessibleFirstLayer(
+  pallet: PalletConfig,
+  floorItems: PlacementItem[],
+  placed: PlacedBox[],
+  minSupportFraction: number,
+  options: PackingOptions,
+) {
+  let searchNodes = 0;
+  const deadline =
+    Date.now() +
+    (options.scannableOptimization
+      ? SCANNABLE_TIME_BUDGET_MS
+      : PLACEMENT_TIME_BUDGET_MS);
+
+  const search = (
+    remainingItems: PlacementItem[],
+    currentPlaced: PlacedBox[],
+  ): PlacedBox[] | null => {
+    searchNodes += 1;
+    if (searchNodes > MAX_FIRST_LAYER_SEARCH_NODES || Date.now() > deadline) {
+      return null;
+    }
+
+    if (remainingItems.length === 0) {
+      return currentPlaced;
+    }
+
+    const item = remainingItems[0];
+    const candidates = findPlacementCandidates(
+      item,
+      currentPlaced,
+      pallet,
+      minSupportFraction,
+      options,
+      [0],
+      true,
+      true,
+      true,
+    )
+      .filter((candidate) =>
+        isFloorLayoutAccessible(pallet, [
+          ...currentPlaced,
+          candidate.candidate,
+        ]),
+      )
+      .sort(
+        (a, b) =>
+          b.score - a.score ||
+          a.coords.z - b.coords.z ||
+          a.coords.x - b.coords.x ||
+          a.coords.y - b.coords.y,
+      );
+
+    for (const candidate of candidates.slice(0, MAX_FIRST_LAYER_CANDIDATES)) {
+      const nextPlaced = [...currentPlaced, candidate.candidate];
+      const result = search(remainingItems.slice(1), nextPlaced);
+      if (result) {
+        return result;
+      }
+    }
+
+    return null;
+  };
+
+  return search(floorItems, placed);
+}
+
+function buildGreedyPackingPlan(
+  pallet: PalletConfig,
+  boxes: BoxTemplate[],
+  options: PackingOptions = {},
+) {
+  const minSupportFraction = Math.max(
+    0,
+    Math.min(1, (options as any).minSupportFraction ?? DEFAULT_MIN_SUPPORT),
+  );
+  const items = createPlacementItems(boxes);
+  items.sort((a, b) => b.volume - a.volume || b.height - a.height);
+
+  const placed: PlacedBox[] = [];
+
+  items.forEach((item) => {
+    const placement = findBestPlacement(
+      item,
+      placed,
+      pallet,
+      minSupportFraction,
+      options,
+      false,
+      false,
+      false,
+    );
+    if (!placement) return;
+
+    placed.push(placement.candidate);
+    stabilizePlaced(placed, pallet, minSupportFraction);
+  });
+
+  return annotateVisibility(pallet, assignStackLevels(placed));
+}
+
+function buildLayeredPackingPlan(
+  pallet: PalletConfig,
+  boxes: BoxTemplate[],
+  options: PackingOptions = {},
+) {
+  const minSupportFraction = Math.max(
+    0,
+    Math.min(1, (options as any).minSupportFraction ?? DEFAULT_MIN_SUPPORT),
+  );
+  const placed: PlacedBox[] = [];
+  const inventory = createFoundationPlan(boxes, pallet).sort((a, b) => {
+    const volumeA = getVolume(
+      a.template.width,
+      a.template.depth,
+      a.template.height,
+    );
+    const volumeB = getVolume(
+      b.template.width,
+      b.template.depth,
+      b.template.height,
+    );
+    return volumeB - volumeA || b.template.height - a.template.height;
+  });
+
+  const floorItems: PlacementItem[] = [];
+  for (const entry of inventory) {
+    const targetFirstLayer = Math.min(
+      entry.requiredOnFirstLayer,
+      entry.remaining,
+    );
+    for (let index = 0; index < targetFirstLayer; index += 1) {
+      floorItems.push({
+        id: `${entry.template.id}-floor-${index}`,
+        boxId: entry.template.id,
+        name: entry.template.name,
+        weight: Number(entry.template.weight),
+        color: entry.template.color,
+        width: Number(entry.template.width),
+        depth: Number(entry.template.depth),
+        height: Number(entry.template.height),
+        volume: getVolume(
+          Number(entry.template.width),
+          Number(entry.template.depth),
+          Number(entry.template.height),
+        ),
+      });
+    }
+  }
+
+  const floorPlacements = buildAccessibleFirstLayer(
+    pallet,
+    floorItems,
+    placed,
+    minSupportFraction,
+    options,
+  );
+  if (floorPlacements) {
+    for (const placement of floorPlacements) {
+      placed.push(placement);
+      const entry = inventory.find(
+        (item) => item.template.id === placement.boxId,
+      );
+      if (entry) {
+        entry.remaining -= 1;
+      }
+    }
+    stabilizePlaced(placed, pallet, minSupportFraction);
+  }
+
+  for (const entry of inventory) {
+    const floorBoxesForEntry = placed.filter(
+      (box) => box.boxId === entry.template.id && Math.abs(box.z) < 1e-6,
+    );
+    for (const baseBox of floorBoxesForEntry) {
+      const item: PlacementItem = {
+        id: entry.template.id,
+        boxId: entry.template.id,
+        name: entry.template.name,
+        weight: Number(entry.template.weight),
+        color: entry.template.color,
+        width: Number(entry.template.width),
+        depth: Number(entry.template.depth),
+        height: Number(entry.template.height),
+        volume: getVolume(
+          Number(entry.template.width),
+          Number(entry.template.depth),
+          Number(entry.template.height),
+        ),
+      };
+
+      let currentBox = baseBox;
+      while (entry.remaining > 0) {
+        const stackPlacement = findVerticalPlacement(
+          item,
+          placed,
+          pallet,
+          currentBox,
+          minSupportFraction,
+        );
+        if (!stackPlacement) break;
+
+        placed.push(stackPlacement.candidate);
+        entry.remaining -= 1;
+        stabilizePlaced(placed, pallet, minSupportFraction);
+        currentBox = stackPlacement.candidate;
+      }
+    }
+  }
+
+  for (const entry of inventory) {
+    while (entry.remaining > 0) {
+      const item: PlacementItem = {
+        id: entry.template.id,
+        boxId: entry.template.id,
+        name: entry.template.name,
+        weight: Number(entry.template.weight),
+        color: entry.template.color,
+        width: Number(entry.template.width),
+        depth: Number(entry.template.depth),
+        height: Number(entry.template.height),
+        volume: getVolume(
+          Number(entry.template.width),
+          Number(entry.template.depth),
+          Number(entry.template.height),
+        ),
+      };
+
+      const placement = findBestPlacement(
+        item,
+        placed,
+        pallet,
+        minSupportFraction,
+        options,
+        false,
+        true,
+        true,
+      );
+      if (!placement) break;
+
+      placed.push(placement.candidate);
+      entry.remaining -= 1;
+      stabilizePlaced(placed, pallet, minSupportFraction);
+    }
+  }
+
+  return annotateVisibility(pallet, assignStackLevels(placed));
 }
 
 // Compute support area fraction for a candidate placed at its current z
-function computeSupportFraction(candidate: PlacedBox, placed: PlacedBox[], pallet: PalletConfig) {
+function computeSupportFraction(
+  candidate: PlacedBox,
+  placed: PlacedBox[],
+  pallet: PalletConfig,
+) {
   const eps = 1e-6;
   if (candidate.z <= eps) return 1; // fully supported by pallet
 
@@ -309,12 +905,23 @@ function computeSupportFraction(candidate: PlacedBox, placed: PlacedBox[], palle
   if (baseArea <= 0) return 0;
 
   // supporting boxes are those whose top equals candidate.z
-  const supporting = placed.filter((b) => Math.abs(b.z + b.height - candidate.z) < eps && b.id !== candidate.id);
+  const supporting = placed.filter(
+    (b) =>
+      Math.abs(b.z + b.height - candidate.z) < eps && b.id !== candidate.id,
+  );
 
   let supportArea = 0;
   for (const b of supporting) {
-    const overlapX = Math.max(0, Math.min(b.x + b.width, candidate.x + candidate.width) - Math.max(b.x, candidate.x));
-    const overlapY = Math.max(0, Math.min(b.y + b.depth, candidate.y + candidate.depth) - Math.max(b.y, candidate.y));
+    const overlapX = Math.max(
+      0,
+      Math.min(b.x + b.width, candidate.x + candidate.width) -
+        Math.max(b.x, candidate.x),
+    );
+    const overlapY = Math.max(
+      0,
+      Math.min(b.y + b.depth, candidate.y + candidate.depth) -
+        Math.max(b.y, candidate.y),
+    );
     supportArea += overlapX * overlapY;
   }
 
@@ -322,14 +929,16 @@ function computeSupportFraction(candidate: PlacedBox, placed: PlacedBox[], palle
 }
 
 // Try to snap unstable boxes down to nearest supporting z (or mark invalid if none)
-function stabilizePlaced(placed: PlacedBox[], pallet: PalletConfig, minSupportFraction: number) {
+function stabilizePlaced(
+  placed: PlacedBox[],
+  pallet: PalletConfig,
+  minSupportFraction: number,
+) {
   const eps = 1e-6;
-  // collect candidate z positions (pallet base and all tops)
   const positions = new Set<number>([0]);
   placed.forEach((b) => positions.add(b.z + b.height));
   const zCandidates = Array.from(positions).sort((a, b) => a - b);
 
-  // iterate boxes from lowest to highest so we settle the stack
   const sorted = [...placed].sort((a, b) => a.z - b.z);
   for (const box of sorted) {
     const currentSupport = computeSupportFraction(box, placed, pallet);
@@ -338,14 +947,14 @@ function stabilizePlaced(placed: PlacedBox[], pallet: PalletConfig, minSupportFr
       continue;
     }
 
-    // try lower z positions (closest below current)
     const lowerZ = zCandidates.filter((z) => z < box.z).sort((a, b) => b - a);
     let snapped = false;
     for (const z of lowerZ) {
-      // temporarily set z and check collisions
       const origZ = box.z;
       box.z = z;
-      const collisions = placed.some((other) => other.id !== box.id && collide(box, other));
+      const collisions = placed.some(
+        (other) => other.id !== box.id && collide(box, other),
+      );
       if (collisions) {
         box.z = origZ;
         continue;
@@ -360,19 +969,49 @@ function stabilizePlaced(placed: PlacedBox[], pallet: PalletConfig, minSupportFr
     }
 
     if (!snapped) {
-      box.invalid = true; // mark as unstable/invalid
+      box.invalid = true;
     }
   }
 }
 
+export function buildPackingPlan(
+  pallet: PalletConfig,
+  boxes: BoxTemplate[],
+  options: PackingOptions = {},
+) {
+  const algorithm = options.algorithm ?? pallet.packingAlgorithm ?? "greedy";
+  if (algorithm === "layered") {
+    return buildLayeredPackingPlan(pallet, boxes, options);
+  }
+
+  return buildGreedyPackingPlan(pallet, boxes, options);
+}
+
 export function summarizePacking(pallet: PalletConfig, placed: PlacedBox[]) {
   const totalVolume = pallet.width * pallet.depth * pallet.height;
-  const usedVolume = placed.reduce((sum, box) => sum + box.width * box.depth * box.height, 0);
+  const usedVolume = placed.reduce(
+    (sum, box) => sum + box.width * box.depth * box.height,
+    0,
+  );
   const totalWeight = placed.reduce((sum, box) => sum + box.weight, 0);
-  const maxHeight = placed.reduce((current, box) => Math.max(current, box.z + box.height), 0);
-  const utilization = totalVolume ? Math.min(100, (usedVolume / totalVolume) * 100) : 0;
-  const heightUsage = pallet.height ? Math.min(100, (maxHeight / pallet.height) * 100) : 0;
-  const efficiency = totalWeight && totalVolume ? Math.round((utilization * 0.7 + heightUsage * 0.2 + Math.min(100, (usedVolume / totalVolume) * 100) * 0.1)) : utilization;
+  const maxHeight = placed.reduce(
+    (current, box) => Math.max(current, box.z + box.height),
+    0,
+  );
+  const utilization = totalVolume
+    ? Math.min(100, (usedVolume / totalVolume) * 100)
+    : 0;
+  const heightUsage = pallet.height
+    ? Math.min(100, (maxHeight / pallet.height) * 100)
+    : 0;
+  const efficiency =
+    totalWeight && totalVolume
+      ? Math.round(
+          utilization * 0.7 +
+            heightUsage * 0.2 +
+            Math.min(100, (usedVolume / totalVolume) * 100) * 0.1,
+        )
+      : utilization;
 
   return {
     totalVolume,

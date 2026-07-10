@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { PalletConfig } from "@/lib/types";
+import { PalletConfig, PackingAlgorithm } from "@/lib/types";
 import {
   ArrowRight,
   CircleDollarSign,
@@ -19,9 +19,11 @@ const presets: Array<{ label: string; config: PalletConfig }> = [
     config: {
       width: 120,
       depth: 80,
-      height: 150,
+      height: 200,
       maxWeight: 1500,
       unit: "cm",
+      packingAlgorithm: "layered",
+      edgeOverflowTolerance: 10,
     },
   },
   {
@@ -29,9 +31,11 @@ const presets: Array<{ label: string; config: PalletConfig }> = [
     config: {
       width: 120,
       depth: 100,
-      height: 150,
+      height: 200,
       maxWeight: 1800,
       unit: "cm",
+      packingAlgorithm: "layered",
+      edgeOverflowTolerance: 0,
     },
   },
   {
@@ -39,9 +43,11 @@ const presets: Array<{ label: string; config: PalletConfig }> = [
     config: {
       width: 120,
       depth: 100,
-      height: 150,
+      height: 180,
       maxWeight: 1600,
       unit: "cm",
+      packingAlgorithm: "layered",
+      edgeOverflowTolerance: 0,
     },
   },
 ];
@@ -62,6 +68,7 @@ export function PalletConfigPanel({ config, onChange }: Props) {
     depth: String(config.depth ?? ""),
     height: String(config.height ?? ""),
     maxWeight: String(config.maxWeight ?? ""),
+    edgeOverflowTolerance: String(config.edgeOverflowTolerance ?? 0),
   });
 
   useEffect(() => {
@@ -70,10 +77,20 @@ export function PalletConfigPanel({ config, onChange }: Props) {
       depth: String(config.depth ?? ""),
       height: String(config.height ?? ""),
       maxWeight: String(config.maxWeight ?? ""),
+      edgeOverflowTolerance: String(config.edgeOverflowTolerance ?? 0),
     });
-  }, [config.width, config.depth, config.height, config.maxWeight]);
+  }, [
+    config.width,
+    config.depth,
+    config.height,
+    config.maxWeight,
+    config.edgeOverflowTolerance,
+  ]);
 
-  const update = (field: keyof PalletConfig, value: number) => {
+  const update = (
+    field: keyof PalletConfig,
+    value: number | PackingAlgorithm,
+  ) => {
     onChange({ ...config, [field]: value });
   };
 
@@ -95,7 +112,8 @@ export function PalletConfigPanel({ config, onChange }: Props) {
               Pallet configuration
             </h2>
             <p className="text-xs text-slate-400">
-              Define your pallet size, height limit and maximum weight.
+              Define your pallet size, height limit, optimization mode and edge
+              tolerance.
             </p>
           </div>
           {expanded ? (
@@ -147,6 +165,54 @@ export function PalletConfigPanel({ config, onChange }: Props) {
                 </label>
               );
             })}
+          </div>
+
+          <div className="grid gap-2 sm:grid-cols-2">
+            <label className="block text-sm text-slate-300">
+              <span className="mb-2 block text-slate-400">
+                Optimization mode
+              </span>
+              <select
+                value={config.packingAlgorithm ?? "greedy"}
+                onChange={(event) =>
+                  update(
+                    "packingAlgorithm",
+                    event.target.value as PackingAlgorithm,
+                  )
+                }
+                className="w-full rounded-2xl border border-slate-800 bg-slate-950/90 px-3 py-2 text-white outline-none transition focus:border-brand-400"
+              >
+                <option value="greedy">Greedy placement</option>
+                <option value="layered">Layer-based optimization</option>
+              </select>
+            </label>
+
+            <label className="block text-sm text-slate-300">
+              <span className="mb-2 block text-slate-400">
+                Edge overflow tolerance
+              </span>
+              <div className="relative">
+                <input
+                  type="number"
+                  min={0}
+                  step="0.5"
+                  value={local.edgeOverflowTolerance}
+                  onChange={(event) => {
+                    const val = normalizeNumberInput(event.target.value);
+                    setLocal((cur) => ({ ...cur, edgeOverflowTolerance: val }));
+                  }}
+                  onBlur={() => {
+                    const raw = local.edgeOverflowTolerance;
+                    const parsed = raw === "" ? 0 : Number(raw);
+                    update("edgeOverflowTolerance", parsed);
+                  }}
+                  className="w-full rounded-2xl border border-slate-800 bg-slate-950/90 px-3 py-2 pr-12 text-white outline-none transition focus:border-brand-400"
+                />
+                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-slate-400">
+                  cm
+                </span>
+              </div>
+            </label>
           </div>
 
           <div className="space-y-2">

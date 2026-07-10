@@ -22,12 +22,14 @@ const defaultPallet: PalletConfig = {
   height: 150,
   maxWeight: 1500,
   unit: "cm",
+  packingAlgorithm: "greedy",
+  edgeOverflowTolerance: 0,
 };
 
 // Derive default boxes from the canonical presets to keep a single source of truth.
 const palette = ["#38bdf8", "#a855f7", "#34d399", "#f97316", "#facc15"];
 const defaultBoxes: BoxTemplate[] = defaultBoxPresets
-  .slice(0, 2)
+  .slice(0, 3)
   .map((p, i) => ({
     id: `box-from-preset-${p.id}`,
     name: p.name,
@@ -35,7 +37,7 @@ const defaultBoxes: BoxTemplate[] = defaultBoxPresets
     depth: p.depth,
     height: p.height,
     weight: p.weight,
-    quantity: 3,
+    quantity: i === 0 ? 64 : i === 1 ? 12 : i === 2 ? 8 : 4,
     color: palette[i % palette.length],
   }));
 
@@ -55,6 +57,7 @@ export default function HomePage() {
   const [useScannableOptimization, setUseScannableOptimization] =
     useState(false);
   const [showBoxOutlines, setShowBoxOutlines] = useState(false);
+  const [isOptimizing, setIsOptimizing] = useState(false);
 
   useEffect(() => {
     const stored = localStorage.getItem(BOX_PRESETS_STORAGE_KEY);
@@ -117,12 +120,24 @@ export default function HomePage() {
   }, [levelOptions, activeLayer]);
 
   const optimize = () => {
-    const plan = buildPackingPlan(pallet, boxes, {
-      scannableOptimization: useScannableOptimization,
-    });
-    setPlacedBoxes(plan);
-    setActiveLayer("all");
-    setShowScannableOnly(false);
+    if (isOptimizing) return;
+
+    setIsOptimizing(true);
+
+    window.setTimeout(() => {
+      try {
+        const plan = buildPackingPlan(pallet, boxes, {
+          scannableOptimization: useScannableOptimization,
+        });
+        setPlacedBoxes(plan);
+        setActiveLayer("all");
+        setShowScannableOnly(false);
+      } catch (error) {
+        console.error("Optimization failed", error);
+      } finally {
+        setIsOptimizing(false);
+      }
+    }, 0);
   };
 
   const resetLayout = () => {
@@ -197,7 +212,7 @@ export default function HomePage() {
   return (
     <>
       <TopNavigation activeSection={activeSection} />
-      <main className="min-h-screen px-4 py-5 sm:px-6 lg:px-10">
+      <main className="relative min-h-screen px-4 py-5 sm:px-6 lg:px-10">
         {activeSection === "optimizer" ? (
           <div className="mx-auto max-w-[1440px] space-y-5">
             <header className="rounded-[2rem] border border-slate-800/80 bg-slate-950/70 p-6 shadow-soft backdrop-blur-xl">
@@ -298,6 +313,7 @@ export default function HomePage() {
                 scannableCounts={visibilityCounts}
                 useScannableOptimization={useScannableOptimization}
                 showBoxOutlines={showBoxOutlines}
+                isOptimizing={isOptimizing}
                 onToggleScannableOnly={() =>
                   setShowScannableOnly((current) => !current)
                 }
@@ -315,6 +331,17 @@ export default function HomePage() {
           </div>
         ) : (
           <BoxPresetsManager presets={presets} />
+        )}
+        {isOptimizing && (
+          <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/80 backdrop-blur-sm">
+            <div className="flex min-w-[240px] flex-col items-center justify-center rounded-[2rem] border border-slate-800 bg-slate-900/95 px-8 py-8 shadow-2xl shadow-slate-950/50">
+              <div className="mb-4 h-10 w-10 animate-spin rounded-full border-4 border-brand-500/30 border-t-brand-500" />
+              <p className="text-lg font-semibold text-white">Optimizing...</p>
+              <p className="mt-2 text-sm text-slate-400">
+                Processing your pallet layout
+              </p>
+            </div>
+          </div>
         )}
       </main>
     </>

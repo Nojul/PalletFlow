@@ -19,6 +19,7 @@ type Props = {
   activeLayer: number | "all";
   layers: LevelOption[];
   scannableOnly: boolean;
+  isOptimizing?: boolean;
   scannableCounts: {
     visible: number;
     topOnly: number;
@@ -49,6 +50,7 @@ export function OptimizerSidebar({
   scannableCounts,
   useScannableOptimization,
   showBoxOutlines,
+  isOptimizing = false,
   onSelectLayer,
   onOptimize,
   onReset,
@@ -122,23 +124,25 @@ export function OptimizerSidebar({
 
           <div
             id="levels-list"
-            className={`mt-2 grid gap-2 transition-all duration-200 ${levelsOpen ? "max-h-96" : "max-h-0 overflow-hidden"}`}
+            className={`mt-2 overflow-hidden transition-all duration-200 ${levelsOpen ? "max-h-56 sm:max-h-72" : "max-h-0"}`}
           >
-            {layers.map((item) => (
-              <button
-                key={String(item.value)}
-                type="button"
-                onClick={() => onSelectLayer(item.value)}
-                className={`rounded-2xl border px-3 py-3 text-left transition ${
-                  item.value === activeLayer
-                    ? "border-brand-500 bg-brand-500/10 text-white"
-                    : "border-slate-800 bg-slate-900/80 text-slate-300 hover:border-slate-600"
-                }`}
-              >
-                <div className="font-semibold">{item.label}</div>
-                <div className="text-xs text-slate-500">{item.subtitle}</div>
-              </button>
-            ))}
+            <div className="flex max-h-56 flex-col gap-2 overflow-y-auto overflow-x-hidden pr-1 sm:max-h-72">
+              {layers.map((item) => (
+                <button
+                  key={String(item.value)}
+                  type="button"
+                  onClick={() => onSelectLayer(item.value)}
+                  className={`rounded-2xl border px-3 py-3 text-left transition ${
+                    item.value === activeLayer
+                      ? "border-brand-500 bg-brand-500/10 text-white"
+                      : "border-slate-800 bg-slate-900/80 text-slate-300 hover:border-slate-600"
+                  }`}
+                >
+                  <div className="font-semibold">{item.label}</div>
+                  <div className="text-xs text-slate-500">{item.subtitle}</div>
+                </button>
+              ))}
+            </div>
           </div>
           {levelsOpen && (
             <p className="mt-3 text-xs text-slate-400">
@@ -154,7 +158,8 @@ export function OptimizerSidebar({
             type="checkbox"
             checked={useScannableOptimization}
             onChange={onToggleScannableOptimization}
-            className="h-4 w-4 rounded border-slate-700 bg-slate-950 text-brand-500 focus:ring-brand-500"
+            disabled={isOptimizing}
+            className="h-4 w-4 rounded border-slate-700 bg-slate-950 text-brand-500 focus:ring-brand-500 disabled:cursor-not-allowed disabled:opacity-50"
           />
           <span>Use Scannable Layout Optimization</span>
         </label>
@@ -162,7 +167,8 @@ export function OptimizerSidebar({
         <button
           type="button"
           onClick={onToggleScannableOnly}
-          className="inline-flex w-full items-center justify-center gap-2 rounded-3xl border border-slate-800 bg-slate-950/90 px-3 py-2 text-sm font-semibold text-slate-200 transition hover:border-brand-400"
+          disabled={isOptimizing}
+          className="inline-flex w-full items-center justify-center gap-2 rounded-3xl border border-slate-800 bg-slate-950/90 px-3 py-2 text-sm font-semibold text-slate-200 transition hover:border-brand-400 disabled:cursor-not-allowed disabled:opacity-50"
         >
           {scannableOnly ? "Show full layout" : "Scannable-only view"}
         </button>
@@ -172,7 +178,8 @@ export function OptimizerSidebar({
             type="checkbox"
             checked={showBoxOutlines}
             onChange={onToggleBoxOutlines}
-            className="h-4 w-4 rounded border-slate-700 bg-slate-950 text-brand-500 focus:ring-brand-500"
+            disabled={isOptimizing}
+            className="h-4 w-4 rounded border-slate-700 bg-slate-950 text-brand-500 focus:ring-brand-500 disabled:cursor-not-allowed disabled:opacity-50"
           />
           <span>Show box outlines</span>
         </label>
@@ -201,14 +208,16 @@ export function OptimizerSidebar({
         <button
           type="button"
           onClick={onOptimize}
-          className="inline-flex w-full items-center justify-center gap-2 rounded-3xl bg-brand-500 px-3 py-2 text-sm font-semibold text-white transition hover:bg-brand-600"
+          disabled={isOptimizing}
+          className="inline-flex w-full items-center justify-center gap-2 rounded-3xl bg-brand-500 px-3 py-2 text-sm font-semibold text-white transition hover:bg-brand-600 disabled:cursor-not-allowed disabled:opacity-70"
         >
           <ArrowRight size={18} /> Optimize packing
         </button>
         <button
           type="button"
           onClick={onReset}
-          className="inline-flex w-full items-center justify-center rounded-3xl border border-slate-800 bg-slate-950/90 px-3 py-2 text-sm font-semibold text-slate-300 transition hover:border-brand-400"
+          disabled={isOptimizing}
+          className="inline-flex w-full items-center justify-center rounded-3xl border border-slate-800 bg-slate-950/90 px-3 py-2 text-sm font-semibold text-slate-300 transition hover:border-brand-400 disabled:cursor-not-allowed disabled:opacity-50"
         >
           Reset layout
         </button>
