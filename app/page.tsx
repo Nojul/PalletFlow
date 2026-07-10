@@ -8,6 +8,7 @@ import { PalletConfigPanel } from "@/components/PalletConfigPanel";
 import { PalletScene } from "@/components/PalletScene";
 import { TopDownView } from "@/components/TopDownView";
 import { TopNavigation } from "@/components/TopNavigation";
+import { AboutUsPage } from "@/components/AboutUsPage";
 import { buildPackingPlan, summarizePacking } from "@/lib/packing";
 import {
   BOX_PRESETS_STORAGE_KEY,
@@ -46,7 +47,7 @@ export default function HomePage() {
   const [boxes, setBoxes] = useState<BoxTemplate[]>(defaultBoxes);
   const [presets, setPresets] = useState<BoxPreset[]>(defaultBoxPresets);
   const [activeSection, setActiveSection] = useState<
-    "optimizer" | "presets" | "packing"
+    "optimizer" | "presets" | "about us"
   >("optimizer");
   const [placedBoxes, setPlacedBoxes] = useState(
     [] as Array<ReturnType<typeof buildPackingPlan>[number]>,
@@ -82,7 +83,7 @@ export default function HomePage() {
       const section = (event as CustomEvent<string>).detail as
         | "optimizer"
         | "presets"
-        | "packing";
+        | "about us";
       setActiveSection(section);
     };
 
@@ -329,9 +330,11 @@ export default function HomePage() {
               />
             </div>
           </div>
-        ) : (
+        ) : activeSection === "presets" ? (
           <BoxPresetsManager presets={presets} />
-        )}
+        ) : activeSection === "about us" ? (
+          <AboutUsPage />
+        ) : null}
         {isOptimizing && (
           <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/80 backdrop-blur-sm">
             <div className="flex min-w-[240px] flex-col items-center justify-center rounded-[2rem] border border-slate-800 bg-slate-900/95 px-8 py-8 shadow-2xl shadow-slate-950/50">

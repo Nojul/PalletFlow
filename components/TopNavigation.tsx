@@ -1,8 +1,8 @@
 "use client";
 
-import { Boxes, LayoutGrid, Layers, PackageOpen } from "lucide-react";
+import { Users, LayoutGrid, Layers, PackageOpen } from "lucide-react";
 
-type Section = "optimizer" | "presets" | "packing";
+type Section = "optimizer" | "presets" | "about us";
 
 type Props = {
   activeSection: Section;
@@ -12,7 +12,7 @@ const sections: Array<{ id: Section; label: string; icon: typeof LayoutGrid }> =
   [
     { id: "optimizer", label: "Optimizer", icon: Layers },
     { id: "presets", label: "Box Presets", icon: PackageOpen },
-    { id: "packing", label: "Packing", icon: Boxes },
+    { id: "about us", label: "About us", icon: Users },
   ];
 
 export function TopNavigation({ activeSection }: Props) {
