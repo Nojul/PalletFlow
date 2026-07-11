@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { BoxManager } from "@/components/BoxManager";
 import { BoxPresetsManager } from "@/components/BoxPresetsManager";
 import { OptimizerSidebar } from "@/components/OptimizerSidebar";
-import { PalletConfigPanel } from "@/components/PalletConfigPanel";
+import { PalletConfigPanel, euroPallet } from "@/components/PalletConfigPanel";
 import { PalletScene } from "@/components/PalletScene";
 import { TopDownView } from "@/components/TopDownView";
 import { TopNavigation } from "@/components/TopNavigation";
@@ -16,16 +16,6 @@ import {
   parseStoredBoxPresets,
 } from "@/lib/presetStorage";
 import { BoxPreset, BoxTemplate, PalletConfig } from "@/lib/types";
-
-const defaultPallet: PalletConfig = {
-  width: 120,
-  depth: 80,
-  height: 150,
-  maxWeight: 1500,
-  unit: "cm",
-  packingAlgorithm: "greedy",
-  edgeOverflowTolerance: 0,
-};
 
 // Derive default boxes from the canonical presets to keep a single source of truth.
 const palette = ["#38bdf8", "#a855f7", "#34d399", "#f97316", "#facc15"];
@@ -43,7 +33,7 @@ const defaultBoxes: BoxTemplate[] = defaultBoxPresets
   }));
 
 export default function HomePage() {
-  const [pallet, setPallet] = useState<PalletConfig>(defaultPallet);
+  const [pallet, setPallet] = useState<PalletConfig>(euroPallet);
   const [boxes, setBoxes] = useState<BoxTemplate[]>(defaultBoxes);
   const [presets, setPresets] = useState<BoxPreset[]>(defaultBoxPresets);
   const [activeSection, setActiveSection] = useState<
@@ -101,7 +91,9 @@ export default function HomePage() {
       value: layer,
       label: index === 0 ? "First level" : `Level ${index + 1}`,
       subtitle:
-        layer === 0 ? "Ground floor" : `${Math.round(layer)} cm above base`,
+        layer === 0
+          ? "Ground floor"
+          : `  Height: ${placedBoxes.find((b) => b.layer === layer)?.z} cm`,
     }));
 
     return [

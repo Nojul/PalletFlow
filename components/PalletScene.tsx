@@ -62,11 +62,7 @@ const BoxMesh = ({
         offsetY + box.z + box.height / 2,
         box.y + box.depth / 2,
       ]}
-      rotation={[
-        (box.rotationX * Math.PI) / 180,
-        (box.rotationY * Math.PI) / 180,
-        0,
-      ]}
+      rotation={[0, (box.rotationY * Math.PI) / 180, 0]}
     >
       <mesh
         geometry={geom}
@@ -147,15 +143,15 @@ export function PalletScene({
     metalness: 0.05,
   };
 
+  const palletSize = Math.sqrt(pallet.width ** 2 + pallet.depth ** 2);
+
   return (
     <div className="relative h-full overflow-hidden rounded-[2rem] border border-slate-800/80 bg-slate-950/80 shadow-soft">
       <Canvas
         camera={{
-          position: [
-            pallet.width * 1.2,
-            pallet.height * 0.75,
-            pallet.depth * 1.4,
-          ],
+          // position: [palletSize * 1.2, palletSize * 0.9, palletSize * 1.2],
+          position: [palletSize * 1.2, palletSize * 0.9, palletSize * 1.6],
+
           fov: 42,
         }}
       >
@@ -171,7 +167,7 @@ export function PalletScene({
             20,
             Math.min(pallet.width, pallet.depth) * 0.75,
           )}
-          maxDistance={Math.max(pallet.width, pallet.depth) * 3.5}
+          maxDistance={palletSize * 5}
           minPolarAngle={0.25 * Math.PI}
           maxPolarAngle={1.35 * Math.PI}
         />

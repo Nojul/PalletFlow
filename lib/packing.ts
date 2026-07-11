@@ -73,38 +73,22 @@ function getAllOrientationVariants(item: {
   depth: number;
   height: number;
 }): OrientationVariant[] {
-  const baseDimensions = [item.width, item.depth, item.height];
-  const variants = new Map<string, OrientationVariant>();
-
-  const permutations = [
-    [0, 1, 2],
-    [0, 2, 1],
-    [1, 0, 2],
-    [1, 2, 0],
-    [2, 0, 1],
-    [2, 1, 0],
+  return [
+    {
+      width: item.width,
+      depth: item.depth,
+      height: item.height,
+      rotationX: 0,
+      rotationY: 0,
+    },
+    {
+      width: item.depth,
+      depth: item.width,
+      height: item.height,
+      rotationX: 0,
+      rotationY: 90,
+    },
   ];
-
-  permutations.forEach((order) => {
-    const [first, second, third] = order;
-    const width = baseDimensions[first];
-    const depth = baseDimensions[second];
-    const height = baseDimensions[third];
-    const variant: OrientationVariant = {
-      width,
-      depth,
-      height,
-      rotationX: third === 2 ? 0 : 90,
-      rotationY: first === 1 ? 90 : 0,
-    };
-
-    const key = `${variant.width}:${variant.depth}:${variant.height}`;
-    if (!variants.has(key)) {
-      variants.set(key, variant);
-    }
-  });
-
-  return Array.from(variants.values());
 }
 
 function createPlacementItems(boxes: BoxTemplate[]) {
@@ -169,7 +153,7 @@ function fitsInside(
 
 type VisibilityStatus = "side-visible" | "top-only" | "hidden";
 
-const DEFAULT_MIN_SUPPORT = 0.7; // 70% of base area must be supported by pallet or boxes below
+const DEFAULT_MIN_SUPPORT = 0.8;
 const MAX_CANDIDATES_PER_PLACEMENT = 24;
 const MAX_FIRST_LAYER_CANDIDATES = 12;
 const MAX_FIRST_LAYER_SEARCH_NODES = 800;
@@ -332,6 +316,73 @@ function isFloorLayoutAccessible(
   );
 }
 
+// Compute support area fraction for a candidate placed at its current z
+function computeSupportFraction(
+  candidate: PlacedBox,
+  placed: PlacedBox[],
+  pallet: PalletConfig,
+) {
+  const eps = 1e-6;
+  if (candidate.z <= eps) return 1; // fully supported by pallet
+
+  const baseArea = candidate.width * candidate.depth;
+  if (baseArea <= 0) return 0;
+
+  // supporting boxes are those whose top equals candidate.z
+  const supporting = placed.filter(
+    (b) =>
+      Math.abs(b.z + b.height - candidate.z) < eps && b.id !== candidate.id,
+  );
+
+  let supportArea = 0;
+  for (const b of supporting) {
+    const overlapX = Math.max(
+      0,
+      Math.min(b.x + b.width, candidate.x + candidate.width) -
+        Math.max(b.x, candidate.x),
+    );
+    const overlapY = Math.max(
+      0,
+      Math.min(b.y + b.depth, candidate.y + candidate.depth) -
+        Math.max(b.y, candidate.y),
+    );
+    supportArea += overlapX * overlapY;
+  }
+
+  return supportArea / baseArea;
+}
+
+function getStackAlignmentPenalty(candidate: PlacedBox, placed: PlacedBox[]) {
+  if (candidate.z === 0) return 0;
+
+  const supporting = placed.filter(
+    (box) =>
+      Math.abs(box.z + box.height - candidate.z) < 1e-6 &&
+      collide(
+        {
+          ...candidate,
+          z: candidate.z - candidate.height,
+        },
+        box,
+      ),
+  );
+
+  if (supporting.length === 0) return 500000;
+
+  const bestAlignment = supporting.reduce((best, box) => {
+    const xOffset = Math.abs(candidate.x - box.x);
+    const yOffset = Math.abs(candidate.y - box.y);
+
+    return Math.min(best, xOffset + yOffset);
+  }, Infinity);
+
+  // Strongly penalize any lateral offset on top of another box.
+  // Use a much larger multiplier and add a base penalty for any offset.
+  const offsetPenalty =
+    bestAlignment === 0 ? 0 : 1000000 + bestAlignment * 5000;
+  return offsetPenalty;
+}
+
 function getPlacementScore(
   candidate: PlacedBox,
   placed: PlacedBox[],
@@ -389,11 +440,23 @@ function getPlacementScore(
     );
   }
 
+  const sameHeightBoxes = placed.filter(
+    (b) => Math.abs(b.z - candidate.z) < 1e-6,
+  );
+
+  const currentLayerPenalty =
+    candidate.z > 0 && sameHeightBoxes.length === 0 ? 500000 : 0;
+
+  const heightPenalty = candidate.z * 5000;
+
+  const gapPenalty = (candidate.x + candidate.y) * 10;
+
+  const stairPenalty = getStackAlignmentPenalty(candidate, placed);
+
+  // Ensure alignment penalty dominates: if aligned, stairPenalty is 0;
+  // if not aligned, it's huge, so this term alone will decide.
   return (
-    (candidate.z === 0 ? 1000000 : 0) -
-    candidate.z * 100 -
-    candidate.x -
-    candidate.y
+    1000000 - currentLayerPenalty - heightPenalty - gapPenalty - stairPenalty
   );
 }
 
@@ -402,6 +465,35 @@ function expandPositions(placed: PlacedBox[]) {
   positions.add(0);
   placed.forEach((item) => positions.add(item.z + item.height));
   return Array.from(positions).sort((a, b) => a - b);
+}
+
+function generateAxisPositions(
+  placedBoxes: PlacedBox[],
+  axis: "x" | "y",
+  maxCoord: number,
+  step: number,
+): number[] {
+  if (maxCoord < -1e-6) return [];
+  const positions = new Set<number>();
+  positions.add(0);
+
+  // Always test positions flush with existing box edges — this is what
+  // prevents the staircase/pyramid drift.
+  for (const box of placedBoxes) {
+    const start = axis === "x" ? box.x : box.y;
+    const size = axis === "x" ? box.width : box.depth;
+    positions.add(start);
+    positions.add(start + size);
+  }
+
+  // Fill in the rest of the search space with the regular grid.
+  for (let value = 0; value <= maxCoord + 1e-6; value += step) {
+    positions.add(value);
+  }
+
+  return Array.from(positions)
+    .filter((value) => value >= -1e-6 && value <= maxCoord + 1e-6)
+    .sort((a, b) => a - b);
 }
 
 function findPlacementCandidates(
@@ -436,10 +528,23 @@ function findPlacementCandidates(
     ? MAX_CANDIDATES_PER_PLACEMENT + 8
     : MAX_CANDIDATES_PER_PLACEMENT;
 
-  for (const z of zCandidates) {
-    for (const variant of orientationVariants) {
-      for (let x = 0; x <= bounds.width - variant.width + 1e-6; x += step) {
-        for (let y = 0; y <= bounds.depth - variant.depth + 1e-6; y += step) {
+  for (const variant of orientationVariants) {
+    const xPositions = generateAxisPositions(
+      placed,
+      "x",
+      bounds.width - variant.width,
+      step,
+    );
+    const yPositions = generateAxisPositions(
+      placed,
+      "y",
+      bounds.depth - variant.depth,
+      step,
+    );
+
+    for (const z of zCandidates) {
+      for (const x of xPositions) {
+        for (const y of yPositions) {
           if (Date.now() > deadline) {
             return scoredCandidates;
           }
@@ -580,13 +685,21 @@ function findVerticalPlacement(
     id: createId(),
     boxId: item.boxId,
     name: item.name,
-    originalWidth: item.width,
-    originalDepth: item.depth,
-    originalHeight: item.height,
+
+    originalWidth: baseBox.originalWidth,
+    originalDepth: baseBox.originalDepth,
+    originalHeight: baseBox.originalHeight,
+
+    width: baseBox.width,
+    depth: baseBox.depth,
+    height: baseBox.height,
+
     x: baseBox.x,
     y: baseBox.y,
     z: baseBox.z + baseBox.height,
-    layer: baseBox.z + baseBox.height,
+
+    rotationX: baseBox.rotationX,
+    rotationY: baseBox.rotationY,
   };
 
   if (!fitsInside(pallet, candidate, candidate)) return null;
@@ -594,6 +707,10 @@ function findVerticalPlacement(
 
   const supportFraction = computeSupportFraction(candidate, placed, pallet);
   if (supportFraction < minSupportFraction) return null;
+
+  candidate.x = baseBox.x;
+  candidate.y = baseBox.y;
+  candidate.z = baseBox.z + baseBox.height;
 
   return {
     candidate,
@@ -708,6 +825,86 @@ function buildAccessibleFirstLayer(
   };
 
   return search(floorItems, placed);
+}
+
+function stabilizePlaced(
+  placed: PlacedBox[],
+  pallet: PalletConfig,
+  minSupportFraction: number,
+) {
+  const eps = 1e-6;
+  const positions = new Set<number>([0]);
+  placed.forEach((b) => positions.add(b.z + b.height));
+  const zCandidates = Array.from(positions).sort((a, b) => a - b);
+
+  const sorted = [...placed].sort((a, b) => a.z - b.z);
+  for (const box of sorted) {
+    const currentSupport = computeSupportFraction(box, placed, pallet);
+    if (currentSupport >= minSupportFraction) {
+      box.invalid = false;
+      // Try to snap x/y to a supporting box if there's significant overlap
+      if (box.z > eps) {
+        const supporting = placed.filter(
+          (b) => Math.abs(b.z + b.height - box.z) < eps && b.id !== box.id,
+        );
+        for (const b of supporting) {
+          const overlapX = Math.max(
+            0,
+            Math.min(b.x + b.width, box.x + box.width) - Math.max(b.x, box.x),
+          );
+          const overlapY = Math.max(
+            0,
+            Math.min(b.y + b.depth, box.y + box.depth) - Math.max(b.y, box.y),
+          );
+          const baseArea = box.width * box.depth;
+          const overlapRatio = (overlapX * overlapY) / baseArea;
+
+          if (overlapRatio >= 0.8) {
+            const origX = box.x;
+            const origY = box.y;
+            box.x = b.x;
+            box.y = b.y;
+
+            const collisions = placed.some(
+              (other) => other.id !== box.id && collide(box, other),
+            );
+            if (!collisions) {
+              box.invalid = false;
+              break;
+            }
+            box.x = origX;
+            box.y = origY;
+          }
+        }
+      }
+      continue;
+    }
+
+    const lowerZ = zCandidates.filter((z) => z < box.z);
+    let snapped = false;
+    for (const z of lowerZ) {
+      const origZ = box.z;
+      box.z = z;
+      const collisions = placed.some(
+        (other) => other.id !== box.id && collide(box, other),
+      );
+      if (collisions) {
+        box.z = origZ;
+        continue;
+      }
+      const support = computeSupportFraction(box, placed, pallet);
+      if (support >= minSupportFraction && z >= 0) {
+        snapped = true;
+        box.invalid = false;
+        break;
+      }
+      box.z = origZ;
+    }
+
+    if (!snapped) {
+      box.invalid = true;
+    }
+  }
 }
 
 function buildGreedyPackingPlan(
@@ -890,88 +1087,6 @@ function buildLayeredPackingPlan(
   }
 
   return annotateVisibility(pallet, assignStackLevels(placed));
-}
-
-// Compute support area fraction for a candidate placed at its current z
-function computeSupportFraction(
-  candidate: PlacedBox,
-  placed: PlacedBox[],
-  pallet: PalletConfig,
-) {
-  const eps = 1e-6;
-  if (candidate.z <= eps) return 1; // fully supported by pallet
-
-  const baseArea = candidate.width * candidate.depth;
-  if (baseArea <= 0) return 0;
-
-  // supporting boxes are those whose top equals candidate.z
-  const supporting = placed.filter(
-    (b) =>
-      Math.abs(b.z + b.height - candidate.z) < eps && b.id !== candidate.id,
-  );
-
-  let supportArea = 0;
-  for (const b of supporting) {
-    const overlapX = Math.max(
-      0,
-      Math.min(b.x + b.width, candidate.x + candidate.width) -
-        Math.max(b.x, candidate.x),
-    );
-    const overlapY = Math.max(
-      0,
-      Math.min(b.y + b.depth, candidate.y + candidate.depth) -
-        Math.max(b.y, candidate.y),
-    );
-    supportArea += overlapX * overlapY;
-  }
-
-  return supportArea / baseArea;
-}
-
-// Try to snap unstable boxes down to nearest supporting z (or mark invalid if none)
-function stabilizePlaced(
-  placed: PlacedBox[],
-  pallet: PalletConfig,
-  minSupportFraction: number,
-) {
-  const eps = 1e-6;
-  const positions = new Set<number>([0]);
-  placed.forEach((b) => positions.add(b.z + b.height));
-  const zCandidates = Array.from(positions).sort((a, b) => a - b);
-
-  const sorted = [...placed].sort((a, b) => a.z - b.z);
-  for (const box of sorted) {
-    const currentSupport = computeSupportFraction(box, placed, pallet);
-    if (currentSupport >= minSupportFraction) {
-      box.invalid = false;
-      continue;
-    }
-
-    const lowerZ = zCandidates.filter((z) => z < box.z).sort((a, b) => b - a);
-    let snapped = false;
-    for (const z of lowerZ) {
-      const origZ = box.z;
-      box.z = z;
-      const collisions = placed.some(
-        (other) => other.id !== box.id && collide(box, other),
-      );
-      if (collisions) {
-        box.z = origZ;
-        continue;
-      }
-      const support = computeSupportFraction(box, placed, pallet);
-      if (support >= minSupportFraction) {
-        snapped = true;
-        box.invalid = false;
-        break;
-      }
-      box.z = origZ;
-    }
-
-    if (!snapped) {
-      box.invalid = true;
-    }
-  }
 }
 
 export function buildPackingPlan(

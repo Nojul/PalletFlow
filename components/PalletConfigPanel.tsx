@@ -13,18 +13,20 @@ type Props = {
   onChange: (config: PalletConfig) => void;
 };
 
+export const euroPallet: PalletConfig = {
+  width: 120,
+  depth: 80,
+  height: 200,
+  maxWeight: 1500,
+  unit: "cm",
+  packingAlgorithm: "layered",
+  edgeOverflowTolerance: 10,
+};
+
 const presets: Array<{ label: string; config: PalletConfig }> = [
   {
     label: "EUR pallet",
-    config: {
-      width: 120,
-      depth: 80,
-      height: 200,
-      maxWeight: 1500,
-      unit: "cm",
-      packingAlgorithm: "layered",
-      edgeOverflowTolerance: 10,
-    },
+    config: euroPallet,
   },
   {
     label: "US pallet",
@@ -47,7 +49,7 @@ const presets: Array<{ label: string; config: PalletConfig }> = [
       maxWeight: 1600,
       unit: "cm",
       packingAlgorithm: "layered",
-      edgeOverflowTolerance: 0,
+      edgeOverflowTolerance: 5,
     },
   },
 ];
@@ -182,15 +184,13 @@ export function PalletConfigPanel({ config, onChange }: Props) {
                 }
                 className="w-full rounded-2xl border border-slate-800 bg-slate-950/90 px-3 py-2 text-white outline-none transition focus:border-brand-400"
               >
-                <option value="greedy">Greedy placement</option>
-                <option value="layered">Layer-based optimization</option>
+                <option value="greedy">Fast placement</option>
+                <option value="layered">Optimized stacking</option>
               </select>
             </label>
 
             <label className="block text-sm text-slate-300">
-              <span className="mb-2 block text-slate-400">
-                Edge overflow tolerance
-              </span>
+              <span className="mb-2 block text-slate-400">Edge tolerance</span>
               <div className="relative">
                 <input
                   type="number"
