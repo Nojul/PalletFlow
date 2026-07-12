@@ -31,13 +31,8 @@ const BoxMesh = ({
 }) => {
   // cache a box geometry and its edges so we don't recreate per-frame
   const geom = React.useMemo(
-    () =>
-      new THREE.BoxGeometry(
-        box.originalWidth,
-        box.originalHeight,
-        box.originalDepth,
-      ),
-    [box.originalWidth, box.originalHeight, box.originalDepth],
+    () => new THREE.BoxGeometry(box.width, box.height, box.depth),
+    [box.width, box.height, box.depth],
   );
   const edges = React.useMemo(() => new THREE.EdgesGeometry(geom), [geom]);
 
@@ -50,7 +45,6 @@ const BoxMesh = ({
     };
   }, [edges, geom]);
 
-  const outlineScale = 1.01; // slightly larger outward offset to reduce edge z-fighting
   const isHighlighted = highlightedBoxId === box.id;
   const shouldShowOutlines = showOutlines || isHighlighted;
   const outlineColor = isHighlighted ? "#f59e0b" : "#ffffff";
@@ -62,7 +56,9 @@ const BoxMesh = ({
         offsetY + box.z + box.height / 2,
         box.y + box.depth / 2,
       ]}
-      rotation={[0, (box.rotationY * Math.PI) / 180, 0]}
+      // Packing already applies orientation to width/depth/height.
+      // Keep render axis-aligned to avoid double-rotating boxes visually.
+      rotation={[0, 0, 0]}
     >
       <mesh
         geometry={geom}
@@ -82,22 +78,23 @@ const BoxMesh = ({
           metalness={0.2}
           opacity={0.95}
           transparent
+          polygonOffset
+          polygonOffsetFactor={1}
+          polygonOffsetUnits={1}
         />
       </mesh>
 
       {shouldShowOutlines && (
-        <lineSegments
-          geometry={edges}
-          scale={[outlineScale, outlineScale, outlineScale]}
-        >
+        <lineSegments geometry={edges} renderOrder={10}>
           <lineBasicMaterial
             attach="material"
             color={outlineColor}
-            linewidth={1}
+            linewidth={2}
             depthTest={true}
-            depthWrite={true}
-            transparent={false}
-            opacity={1}
+            depthWrite={false}
+            transparent
+            opacity={0.95}
+            toneMapped={false}
           />
         </lineSegments>
       )}
