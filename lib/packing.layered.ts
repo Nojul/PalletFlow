@@ -1425,35 +1425,6 @@ function getSurfaceAxisPositions(
     anchors.add(start + size);
   }
 
-  // Add center anchors for dead gaps between already placed boxes.
-  const intervals = localPlaced
-    .map((box) => {
-      const start = useX ? box.x : box.y;
-      const size = useX ? box.width : box.depth;
-      return { start, end: start + size };
-    })
-    .sort((a, b) => a.start - b.start);
-
-  let cursor = min;
-  for (const interval of intervals) {
-    if (interval.start > cursor + GEOMETRY_EPS) {
-      const gap = interval.start - cursor;
-      if (gap >= candidateSize - GEOMETRY_EPS) {
-        anchors.add(cursor + (gap - candidateSize) / 2);
-      }
-    }
-    cursor = Math.max(cursor, interval.end);
-  }
-  if (max > cursor + GEOMETRY_EPS) {
-    const gap = max - cursor;
-    if (gap >= candidateSize - GEOMETRY_EPS) {
-      anchors.add(cursor + (gap - candidateSize) / 2);
-    }
-  }
-
-  // Always try a centered placement on the usable axis range.
-  anchors.add(min + (max - min) / 2);
-
   return Array.from(anchors)
     .filter(
       (value) => value >= min - GEOMETRY_EPS && value <= max + GEOMETRY_EPS,
@@ -1506,6 +1477,11 @@ function scoreSurfaceCandidate(
     Math.abs(candidateCenterX - centerX) + Math.abs(candidateCenterY - centerY);
 
   let adjacency = 0;
+  let sameOrientation = 0;
+  let differentOrientation = 0;
+  let sameFootprint = 0;
+  let differentFootprint = 0;
+
   for (const other of localPlaced) {
     const touchVertical =
       Math.abs(other.x + other.width - candidate.x) <= GEOMETRY_EPS ||
@@ -1528,13 +1504,32 @@ function scoreSurfaceCandidate(
 
     if ((touchVertical && overlapY) || (touchHorizontal && overlapX)) {
       adjacency += 1;
+
+      const sameRotations =
+        other.rotationX === candidate.rotationX &&
+        other.rotationY === candidate.rotationY;
+      if (sameRotations) sameOrientation += 1;
+      else differentOrientation += 1;
+
+      const sameDims =
+        Math.abs(other.width - candidate.width) <= GEOMETRY_EPS &&
+        Math.abs(other.depth - candidate.depth) <= GEOMETRY_EPS;
+      if (sameDims) sameFootprint += 1;
+      else differentFootprint += 1;
     }
   }
+
+  const structureBonus =
+    sameOrientation * 4500 +
+    sameFootprint * 2200 -
+    differentOrientation * 2800 -
+    differentFootprint * 900;
 
   if (strategy === "count-dense") {
     return (
       supportFraction * 120000 +
       adjacency * 3500 +
+      structureBonus +
       rowPotential * 1200 +
       colPotential * 1200 -
       area * 12 -
@@ -1550,6 +1545,7 @@ function scoreSurfaceCandidate(
       rowPotential * 2400 +
       colPotential * 1800 +
       adjacency * 2200 +
+      structureBonus * 1.15 +
       fillRatio * 16000 -
       (rightGap * 55 + bottomGap * 40) -
       totalOverhang * 18000
@@ -1561,9 +1557,38 @@ function scoreSurfaceCandidate(
     fillRatio * 50000 +
     area * 220 +
     adjacency * 1400 -
+    structureBonus * 0.8 -
     centerPenalty * 2 -
     totalOverhang * 15000
   );
+}
+
+function hasSurfaceAdjacency(candidate: PlacedBox, localPlaced: PlacedBox[]) {
+  if (localPlaced.length === 0) return true;
+
+  return localPlaced.some((other) => {
+    const touchVertical =
+      Math.abs(other.x + other.width - candidate.x) <= GEOMETRY_EPS ||
+      Math.abs(candidate.x + candidate.width - other.x) <= GEOMETRY_EPS;
+    const overlapY = overlaps(
+      other.y,
+      other.y + other.depth,
+      candidate.y,
+      candidate.y + candidate.depth,
+    );
+
+    const touchHorizontal =
+      Math.abs(other.y + other.depth - candidate.y) <= GEOMETRY_EPS ||
+      Math.abs(candidate.y + candidate.depth - other.y) <= GEOMETRY_EPS;
+    const overlapX = overlaps(
+      other.x,
+      other.x + other.width,
+      candidate.x,
+      candidate.x + candidate.width,
+    );
+
+    return (touchVertical && overlapY) || (touchHorizontal && overlapX);
+  });
 }
 
 function hasSupportAnchorAlignment(candidate: PlacedBox, placed: PlacedBox[]) {
@@ -1609,9 +1634,39 @@ function hasSupportAnchorAlignment(candidate: PlacedBox, placed: PlacedBox[]) {
     );
   });
 
-  // Allow alignment on at least one axis to fill dead spaces,
-  // while still preventing free-form diagonal staircase drift.
-  return xAligned || yAligned;
+  // Strict anti-stair rule: elevated placements must align in both axes.
+  return xAligned && yAligned;
+}
+
+function getSupportAnchoredAxisPositions(
+  surfaceStart: number,
+  surfaceSize: number,
+  candidateSize: number,
+  supporters: PlacedBox[],
+  useX: boolean,
+  overhangLimit: number,
+) {
+  const min = surfaceStart - overhangLimit;
+  const max = surfaceStart + surfaceSize - candidateSize + overhangLimit;
+  if (max < min - GEOMETRY_EPS) return [] as number[];
+
+  const anchors = new Set<number>([min, max, surfaceStart]);
+  anchors.add(surfaceStart + surfaceSize - candidateSize);
+
+  for (const box of supporters) {
+    const start = useX ? box.x : box.y;
+    const size = useX ? box.width : box.depth;
+    const end = start + size;
+    anchors.add(start);
+    anchors.add(end - candidateSize);
+  }
+
+  return Array.from(anchors)
+    .filter(
+      (value) => value >= min - GEOMETRY_EPS && value <= max + GEOMETRY_EPS,
+    )
+    .map((value) => snapCoord(value))
+    .sort((a, b) => a - b);
 }
 
 function compactSurfacePlacements(
@@ -1769,6 +1824,9 @@ function solveSurfaceMiniPacking(
     // Prefer flat orientations first; only consider upright as fallback.
     for (let uprightPass = 0; uprightPass < 2; uprightPass++) {
       const allowUpright = uprightPass === 1;
+      const supportBoxes = placed.filter(
+        (box) => Math.abs(box.z + box.height - surface.z) <= GEOMETRY_EPS,
+      );
 
       for (const entry of inventory) {
         const typeId = entry.template.id;
@@ -1799,24 +1857,44 @@ function solveSurfaceMiniPacking(
             Math.min(3, Math.round(Math.min(variant.width, variant.depth) / 8)),
           );
 
-          const xs = getSurfaceAxisPositions(
-            surface.x,
-            surface.width,
-            variant.width,
-            localPlaced,
-            true,
-            overhangX,
-            step,
-          );
-          const ys = getSurfaceAxisPositions(
-            surface.y,
-            surface.depth,
-            variant.depth,
-            localPlaced,
-            false,
-            overhangY,
-            step,
-          );
+          const xs =
+            surface.z > GEOMETRY_EPS
+              ? getSupportAnchoredAxisPositions(
+                  surface.x,
+                  surface.width,
+                  variant.width,
+                  supportBoxes,
+                  true,
+                  overhangX,
+                )
+              : getSurfaceAxisPositions(
+                  surface.x,
+                  surface.width,
+                  variant.width,
+                  localPlaced,
+                  true,
+                  overhangX,
+                  step,
+                );
+          const ys =
+            surface.z > GEOMETRY_EPS
+              ? getSupportAnchoredAxisPositions(
+                  surface.y,
+                  surface.depth,
+                  variant.depth,
+                  supportBoxes,
+                  false,
+                  overhangY,
+                )
+              : getSurfaceAxisPositions(
+                  surface.y,
+                  surface.depth,
+                  variant.depth,
+                  localPlaced,
+                  false,
+                  overhangY,
+                  step,
+                );
 
           for (const x of xs) {
             for (const y of ys) {
@@ -1853,6 +1931,12 @@ function solveSurfaceMiniPacking(
 
               if (placed.some((other) => collide(candidate, other))) continue;
               if (localPlaced.some((other) => collide(candidate, other))) {
+                continue;
+              }
+
+              // Keep the local mini-layer contiguous so it creates usable
+              // merged support surfaces above instead of fragmented islands.
+              if (!hasSurfaceAdjacency(candidate, localPlaced)) {
                 continue;
               }
 
