@@ -1,4 +1,5 @@
 import { BoxPreset } from "./types";
+import { createClientId } from "./ui";
 
 export const BOX_PRESETS_STORAGE_KEY = "palletflow-box-presets";
 
@@ -34,9 +35,12 @@ export const defaultBoxPresets: BoxPreset[] = [
     depth: 40,
     height: 40,
     weight: 5,
-  }
+  },
 ];
 
+/**
+ * Safely parses browser-stored presets and falls back to the curated defaults.
+ */
 export function parseStoredBoxPresets(value: string | null): BoxPreset[] {
   if (!value) {
     return defaultBoxPresets;
@@ -48,13 +52,12 @@ export function parseStoredBoxPresets(value: string | null): BoxPreset[] {
       return defaultBoxPresets;
     }
     return parsed.map((item) => ({
-      id: item.id ?? `preset-${Math.random().toString(36).slice(2, 8)}`,
+      id: item.id ?? createClientId("preset"),
       name: item.name ?? "Preset box",
       width: Number(item.width) || 0,
       depth: Number(item.depth) || 0,
       height: Number(item.height) || 0,
       weight: Number(item.weight) || 0,
-      // color intentionally omitted for presets
     }));
   } catch {
     return defaultBoxPresets;

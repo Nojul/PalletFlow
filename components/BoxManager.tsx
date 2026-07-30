@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { BoxTemplate, BoxPreset } from "@/lib/types";
 import { Plus, Trash2, ChevronDown, ChevronRight } from "lucide-react";
+import { BOX_COLOR_SWATCHES, createClientId } from "@/lib/ui";
 
 type Props = {
   boxes: BoxTemplate[];
@@ -9,7 +10,7 @@ type Props = {
 };
 
 const defaultBox = (): BoxTemplate => ({
-  id: `box-${Math.random().toString(36).slice(2, 8)}`,
+  id: createClientId("box"),
   name: "Standard box",
   width: 40,
   depth: 30,
@@ -100,7 +101,7 @@ export function BoxManager({ boxes, onChange, presets = [] }: Props) {
       ...boxes,
       {
         ...draftBox,
-        id: `box-${Math.random().toString(36).slice(2, 8)}`,
+        id: createClientId("box"),
       },
     ]);
     setIsModalOpen(false);
@@ -308,13 +309,7 @@ export function BoxManager({ boxes, onChange, presets = [] }: Props) {
                 <div className="sm:col-span-2">
                   <p className="mb-2 text-sm text-slate-400">Color</p>
                   <div className="mb-2 flex flex-wrap items-center gap-2">
-                    {[
-                      "#38bdf8",
-                      "#a855f7",
-                      "#34d399",
-                      "#f97316",
-                      "#facc15",
-                    ].map((swatch) => (
+                    {BOX_COLOR_SWATCHES.map((swatch) => (
                       <button
                         key={swatch}
                         type="button"
@@ -474,13 +469,7 @@ export function BoxManager({ boxes, onChange, presets = [] }: Props) {
                   <div className="sm:col-span-2">
                     <p className="mb-2 text-sm text-slate-400">Color</p>
                     <div className="mb-2 flex flex-wrap items-center gap-2">
-                      {[
-                        "#38bdf8",
-                        "#a855f7",
-                        "#34d399",
-                        "#f97316",
-                        "#facc15",
-                      ].map((swatch) => (
+                      {BOX_COLOR_SWATCHES.map((swatch) => (
                         <button
                           key={swatch}
                           type="button"

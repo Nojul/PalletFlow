@@ -29,7 +29,6 @@ const BoxMesh = ({
   offsetY: number;
   highlightedBoxId?: string | null;
 }) => {
-  // cache a box geometry and its edges so we don't recreate per-frame
   const geom = React.useMemo(
     () => new THREE.BoxGeometry(box.width, box.height, box.depth),
     [box.width, box.height, box.depth],
@@ -38,10 +37,8 @@ const BoxMesh = ({
 
   React.useEffect(() => {
     return () => {
-      try {
-        edges.dispose();
-        geom.dispose();
-      } catch (e) {}
+      edges.dispose();
+      geom.dispose();
     };
   }, [edges, geom]);
 
@@ -56,8 +53,6 @@ const BoxMesh = ({
         offsetY + box.z + box.height / 2,
         box.y + box.depth / 2,
       ]}
-      // Packing already applies orientation to width/depth/height.
-      // Keep render axis-aligned to avoid double-rotating boxes visually.
       rotation={[0, 0, 0]}
     >
       <mesh
@@ -115,15 +110,13 @@ export function PalletScene({
   const blockHeight = palletVisualThickness * 0.58;
   const gap = 1.5;
 
-  // Vertical stacking: bottom → blocks → top
   const bottomPlanksY = boardHeight / 2;
   const blockY = boardHeight + blockHeight / 2;
   const topBoardY = boardHeight + blockHeight + boardHeight / 2;
   const palletTopSurfaceY = boardHeight + blockHeight + boardHeight;
 
-  // Material definitions for layer debugging (temporary colors)
   const topMaterial = {
-    color: "#8B5E3C", // Light honey wood
+    color: "#8B5E3C",
     roughness: 0.75,
     metalness: 0.05,
   };
@@ -135,7 +128,7 @@ export function PalletScene({
   };
 
   const bottomMaterial = {
-    color: "#6B4A2D", // Darker brown
+    color: "#6B4A2D",
     roughness: 0.75,
     metalness: 0.05,
   };
@@ -146,9 +139,7 @@ export function PalletScene({
     <div className="relative h-full overflow-hidden rounded-[2rem] border border-slate-800/80 bg-slate-950/80 shadow-soft">
       <Canvas
         camera={{
-          // position: [palletSize * 1.2, palletSize * 0.9, palletSize * 1.2],
           position: [palletSize * 1.2, palletSize * 0.9, palletSize * 1.6],
-
           fov: 42,
         }}
       >
@@ -170,7 +161,6 @@ export function PalletScene({
         />
 
         <group position={[pallet.width / 2, 0, pallet.depth / 2]}>
-          {/* TOP BOARDS: 5 boards running across width */}
           {Array.from({ length: 5 }).map((_, index) => {
             const boardDepth = (pallet.depth - gap * 4) / 5;
             const zPos =
@@ -183,12 +173,9 @@ export function PalletScene({
             );
           })}
 
-          {/* SUPPORT BLOCKS: 3×3 grid (9 blocks total) - flush with edges */}
           {Array.from({ length: 3 }).map((_, xi) =>
             Array.from({ length: 3 }).map((_, zi) => {
               const blockSize = Math.min(pallet.width, pallet.depth) * 0.14;
-
-              // Calculate positions so outer blocks are flush with pallet edges
               let xPos;
               if (xi === 0) xPos = -pallet.width / 2 + blockSize / 2;
               else if (xi === 2) xPos = pallet.width / 2 - blockSize / 2;
@@ -211,12 +198,9 @@ export function PalletScene({
             }),
           )}
 
-          {/* BOTTOM LAYER: 3 planks positioned under the 3 block rows */}
           {Array.from({ length: 3 }).map((_, zi) => {
             const blockSize = Math.min(pallet.width, pallet.depth) * 0.14;
             const boardDepth = blockSize;
-
-            // Match the Z positions of block rows
             let zPos;
             if (zi === 0) zPos = -pallet.depth / 2 + blockSize / 2;
             else if (zi === 2) zPos = pallet.depth / 2 - blockSize / 2;
@@ -231,7 +215,6 @@ export function PalletScene({
           })}
         </group>
 
-        {/* PACKED BOXES ON TOP */}
         {boxes
           .filter(
             (box) =>

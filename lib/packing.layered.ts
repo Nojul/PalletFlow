@@ -222,7 +222,7 @@ type VisibilityStatus = "side-visible" | "top-only" | "hidden";
 
 const DEFAULT_MIN_SUPPORT = 0.8;
 const MIN_FLOOR_SUPPORT_FRACTION = 0.6;
-const MAX_CANDIDATES_PER_PLACEMENT = 24;
+const MAX_CANDIDATES_PER_PLACEMENT = 800;
 const LAYER_BEAM_WIDTH = 40;
 const LAYER_STATE_EXPANSIONS = 10;
 const LAYER_TYPE_BRANCHING = 2;
@@ -1312,8 +1312,6 @@ function findVerticalPlacement(
   };
 }
 
-type SurfacePackingStrategy = "count-dense" | "row-fill" | "area-fill";
-
 type TopSurface = {
   id: string;
   x: number;
@@ -1431,136 +1429,6 @@ function getSurfaceAxisPositions(
     )
     .map((value) => snapCoord(value))
     .sort((a, b) => a - b);
-}
-
-function scoreSurfaceCandidate(
-  strategy: SurfacePackingStrategy,
-  candidate: PlacedBox,
-  surface: { x: number; y: number; width: number; depth: number; area: number },
-  localPlaced: PlacedBox[],
-  overhangX: number,
-  overhangY: number,
-  supportFraction: number,
-) {
-  const area = candidate.width * candidate.depth;
-  const fillRatio = area / Math.max(GEOMETRY_EPS, surface.area);
-  const overhangLeft = Math.max(0, surface.x - candidate.x);
-  const overhangRight = Math.max(
-    0,
-    candidate.x + candidate.width - (surface.x + surface.width),
-  );
-  const overhangFront = Math.max(0, surface.y - candidate.y);
-  const overhangBack = Math.max(
-    0,
-    candidate.y + candidate.depth - (surface.y + surface.depth),
-  );
-  const totalOverhang =
-    overhangLeft + overhangRight + overhangFront + overhangBack;
-
-  const surfaceRight = surface.x + surface.width + overhangX;
-  const surfaceBottom = surface.y + surface.depth + overhangY;
-  const rightGap = surfaceRight - (candidate.x + candidate.width);
-  const bottomGap = surfaceBottom - (candidate.y + candidate.depth);
-
-  const rowPotential = Math.floor(
-    (surfaceRight - candidate.x + GEOMETRY_EPS) / candidate.width,
-  );
-  const colPotential = Math.floor(
-    (surfaceBottom - candidate.y + GEOMETRY_EPS) / candidate.depth,
-  );
-
-  const centerX = surface.x + surface.width / 2;
-  const centerY = surface.y + surface.depth / 2;
-  const candidateCenterX = candidate.x + candidate.width / 2;
-  const candidateCenterY = candidate.y + candidate.depth / 2;
-  const centerPenalty =
-    Math.abs(candidateCenterX - centerX) + Math.abs(candidateCenterY - centerY);
-
-  let adjacency = 0;
-  let sameOrientation = 0;
-  let differentOrientation = 0;
-  let sameFootprint = 0;
-  let differentFootprint = 0;
-
-  for (const other of localPlaced) {
-    const touchVertical =
-      Math.abs(other.x + other.width - candidate.x) <= GEOMETRY_EPS ||
-      Math.abs(candidate.x + candidate.width - other.x) <= GEOMETRY_EPS;
-    const overlapY = overlaps(
-      other.y,
-      other.y + other.depth,
-      candidate.y,
-      candidate.y + candidate.depth,
-    );
-    const touchHorizontal =
-      Math.abs(other.y + other.depth - candidate.y) <= GEOMETRY_EPS ||
-      Math.abs(candidate.y + candidate.depth - other.y) <= GEOMETRY_EPS;
-    const overlapX = overlaps(
-      other.x,
-      other.x + other.width,
-      candidate.x,
-      candidate.x + candidate.width,
-    );
-
-    if ((touchVertical && overlapY) || (touchHorizontal && overlapX)) {
-      adjacency += 1;
-
-      const sameRotations =
-        other.rotationX === candidate.rotationX &&
-        other.rotationY === candidate.rotationY;
-      if (sameRotations) sameOrientation += 1;
-      else differentOrientation += 1;
-
-      const sameDims =
-        Math.abs(other.width - candidate.width) <= GEOMETRY_EPS &&
-        Math.abs(other.depth - candidate.depth) <= GEOMETRY_EPS;
-      if (sameDims) sameFootprint += 1;
-      else differentFootprint += 1;
-    }
-  }
-
-  const structureBonus =
-    sameOrientation * 4500 +
-    sameFootprint * 2200 -
-    differentOrientation * 2800 -
-    differentFootprint * 900;
-
-  if (strategy === "count-dense") {
-    return (
-      supportFraction * 120000 +
-      adjacency * 3500 +
-      structureBonus +
-      rowPotential * 1200 +
-      colPotential * 1200 -
-      area * 12 -
-      (rightGap + bottomGap) * 30 -
-      centerPenalty -
-      totalOverhang * 12000
-    );
-  }
-
-  if (strategy === "row-fill") {
-    return (
-      supportFraction * 90000 +
-      rowPotential * 2400 +
-      colPotential * 1800 +
-      adjacency * 2200 +
-      structureBonus * 1.15 +
-      fillRatio * 16000 -
-      (rightGap * 55 + bottomGap * 40) -
-      totalOverhang * 18000
-    );
-  }
-
-  return (
-    supportFraction * 85000 +
-    fillRatio * 50000 +
-    area * 220 +
-    adjacency * 1400 -
-    structureBonus * 0.8 -
-    centerPenalty * 2 -
-    totalOverhang * 15000
-  );
 }
 
 function hasSurfaceAdjacency(candidate: PlacedBox, localPlaced: PlacedBox[]) {
@@ -1800,212 +1668,277 @@ function compactSurfacePlacements(
   return working;
 }
 
+function scoreCompactGridPlan(
+  placements: PlacedBox[],
+  surface: TopSurface,
+  overhangX: number,
+  overhangY: number,
+) {
+  if (placements.length === 0) return -Infinity;
+
+  const filledArea = placements.reduce(
+    (sum, box) => sum + box.width * box.depth,
+    0,
+  );
+  const minX = Math.min(...placements.map((box) => box.x));
+  const maxX = Math.max(...placements.map((box) => box.x + box.width));
+  const minY = Math.min(...placements.map((box) => box.y));
+  const maxY = Math.max(...placements.map((box) => box.y + box.depth));
+  const boundingArea = Math.max(GEOMETRY_EPS, (maxX - minX) * (maxY - minY));
+  const unusedBoundingArea = Math.max(0, boundingArea - filledArea);
+
+  const minAllowedX = surface.x - overhangX;
+  const minAllowedY = surface.y - overhangY;
+  const maxAllowedX = surface.x + surface.width + overhangX;
+  const maxAllowedY = surface.y + surface.depth + overhangY;
+
+  const leftGap = Math.max(0, minX - minAllowedX);
+  const frontGap = Math.max(0, minY - minAllowedY);
+  const rightGap = Math.max(0, maxAllowedX - maxX);
+  const backGap = Math.max(0, maxAllowedY - maxY);
+
+  return (
+    placements.length * 2_000_000 +
+    filledArea * 500 -
+    unusedBoundingArea * 900 -
+    (leftGap + frontGap) * 600 -
+    (rightGap + backGap) * 120
+  );
+}
+
+function buildCompactGridPlanForVariant(
+  surface: TopSurface,
+  placed: PlacedBox[],
+  entry: FoundationPlanEntry,
+  variant: OrientationVariant,
+  pallet: PalletConfig,
+  minSupportFraction: number,
+) {
+  const edgeTolerance = Math.max(0, pallet.edgeOverflowTolerance ?? 0);
+  const supportOverhangX = Math.max(
+    0,
+    variant.width * (1 - minSupportFraction),
+  );
+  const supportOverhangY = Math.max(
+    0,
+    variant.depth * (1 - minSupportFraction),
+  );
+  const overhangX = Math.min(supportOverhangX, edgeTolerance);
+  const overhangY = Math.min(supportOverhangY, edgeTolerance);
+
+  const supportBoxes = placed.filter(
+    (box) => Math.abs(box.z + box.height - surface.z) <= GEOMETRY_EPS,
+  );
+  const step = Math.max(
+    1,
+    Math.min(3, Math.round(Math.min(variant.width, variant.depth) / 8)),
+  );
+
+  const xAxis =
+    surface.z > GEOMETRY_EPS
+      ? getSupportAnchoredAxisPositions(
+          surface.x,
+          surface.width,
+          variant.width,
+          supportBoxes,
+          true,
+          overhangX,
+        )
+      : getSurfaceAxisPositions(
+          surface.x,
+          surface.width,
+          variant.width,
+          [],
+          true,
+          overhangX,
+          step,
+        );
+
+  const yAxis =
+    surface.z > GEOMETRY_EPS
+      ? getSupportAnchoredAxisPositions(
+          surface.y,
+          surface.depth,
+          variant.depth,
+          supportBoxes,
+          false,
+          overhangY,
+        )
+      : getSurfaceAxisPositions(
+          surface.y,
+          surface.depth,
+          variant.depth,
+          [],
+          false,
+          overhangY,
+          step,
+        );
+
+  if (xAxis.length === 0 || yAxis.length === 0) return null;
+
+  const startXCandidates = xAxis.slice(0, Math.min(6, xAxis.length));
+  const startYCandidates = yAxis.slice(0, Math.min(6, yAxis.length));
+
+  let bestPlan: PlacedBox[] = [];
+  let bestScore = -Infinity;
+
+  for (const startX of startXCandidates) {
+    for (const startY of startYCandidates) {
+      const localPlaced: PlacedBox[] = [];
+
+      for (const y of yAxis) {
+        if (y < startY - GEOMETRY_EPS) continue;
+        for (const x of xAxis) {
+          if (x < startX - GEOMETRY_EPS) continue;
+          if (localPlaced.length >= entry.remaining) break;
+
+          const candidate = normalizePlacementGeometry({
+            id: createId(),
+            boxId: entry.template.id,
+            name: entry.template.name,
+            originalWidth: Number(entry.template.width),
+            originalDepth: Number(entry.template.depth),
+            originalHeight: Number(entry.template.height),
+            width: variant.width,
+            depth: variant.depth,
+            height: variant.height,
+            weight: Number(entry.template.weight),
+            color: entry.template.color,
+            x,
+            y,
+            z: surface.z,
+            rotationX: variant.rotationX,
+            rotationY: variant.rotationY,
+            layer: surface.z,
+          });
+
+          if (!fitsInside(pallet, candidate, candidate, true)) continue;
+
+          const overlapsSurface =
+            candidate.x < surface.x + surface.width - GEOMETRY_EPS &&
+            candidate.x + candidate.width > surface.x + GEOMETRY_EPS &&
+            candidate.y < surface.y + surface.depth - GEOMETRY_EPS &&
+            candidate.y + candidate.depth > surface.y + GEOMETRY_EPS;
+          if (!overlapsSurface) continue;
+
+          if (placed.some((other) => collide(candidate, other))) continue;
+          if (localPlaced.some((other) => collide(candidate, other))) continue;
+
+          if (!hasSurfaceAdjacency(candidate, localPlaced)) continue;
+
+          const supportFraction = computeSupportFraction(
+            candidate,
+            [...placed, ...localPlaced],
+            pallet,
+          );
+          if (
+            supportFraction <
+            getRequiredSupportFraction(candidate, minSupportFraction)
+          ) {
+            continue;
+          }
+
+          if (
+            candidate.z > GEOMETRY_EPS &&
+            !hasSupportAnchorAlignment(candidate, [...placed, ...localPlaced])
+          ) {
+            continue;
+          }
+
+          localPlaced.push(candidate);
+        }
+      }
+
+      const score = scoreCompactGridPlan(
+        localPlaced,
+        surface,
+        overhangX,
+        overhangY,
+      );
+      if (score > bestScore) {
+        bestPlan = localPlaced;
+        bestScore = score;
+      }
+    }
+  }
+
+  if (bestPlan.length === 0) return null;
+
+  return {
+    placements: bestPlan,
+    usedByType: { [entry.template.id]: bestPlan.length },
+    count: bestPlan.length,
+    filledArea: bestPlan.reduce((sum, box) => sum + box.width * box.depth, 0),
+  };
+}
+
 function solveSurfaceMiniPacking(
   surface: TopSurface,
   placed: PlacedBox[],
   inventory: FoundationPlanEntry[],
   pallet: PalletConfig,
   minSupportFraction: number,
-  strategy: SurfacePackingStrategy,
-) {
-  const localPlaced: PlacedBox[] = [];
-  const usedByType: Record<string, number> = {};
-  const remainingByType = Object.fromEntries(
-    inventory.map((entry) => [entry.template.id, entry.remaining]),
-  ) as Record<string, number>;
+): {
+  placements: PlacedBox[];
+  usedByType: Record<string, number>;
+  count: number;
+  filledArea: number;
+} {
+  let bestPlan: {
+    placements: PlacedBox[];
+    usedByType: Record<string, number>;
+    count: number;
+    filledArea: number;
+  } | null = null;
 
-  while (true) {
-    let best: {
-      typeId: string;
-      candidate: PlacedBox;
-      score: number;
-    } | null = null;
+  // Prefer flat orientations and a single orientation/type footprint grid.
+  for (let uprightPass = 0; uprightPass < 2; uprightPass++) {
+    const allowUpright = uprightPass === 1;
 
-    // Prefer flat orientations first; only consider upright as fallback.
-    for (let uprightPass = 0; uprightPass < 2; uprightPass++) {
-      const allowUpright = uprightPass === 1;
-      const supportBoxes = placed.filter(
-        (box) => Math.abs(box.z + box.height - surface.z) <= GEOMETRY_EPS,
+    for (const entry of inventory) {
+      if (entry.remaining <= 0) continue;
+
+      const variants = getStackOrientationVariants(entry.template).filter(
+        (variant) => allowUpright || variant.rotationX === 0,
       );
 
-      for (const entry of inventory) {
-        const typeId = entry.template.id;
-        if ((remainingByType[typeId] ?? 0) <= 0) continue;
+      for (const variant of variants) {
+        if (variant.height + surface.z > pallet.height + GEOMETRY_EPS) {
+          continue;
+        }
 
-        const variants = getStackOrientationVariants(entry.template).filter(
-          (variant) => allowUpright || variant.rotationX === 0,
+        const plan = buildCompactGridPlanForVariant(
+          surface,
+          placed,
+          entry,
+          variant,
+          pallet,
+          minSupportFraction,
         );
-        for (const variant of variants) {
-          if (variant.height + surface.z > pallet.height + GEOMETRY_EPS)
-            continue;
+        if (!plan || plan.count === 0) continue;
 
-          const edgeTolerance = Math.max(0, pallet.edgeOverflowTolerance ?? 0);
-          const supportOverhangX = Math.max(
-            0,
-            variant.width * (1 - minSupportFraction),
-          );
-          const supportOverhangY = Math.max(
-            0,
-            variant.depth * (1 - minSupportFraction),
-          );
-          // Controlled overhang: bounded by support and pallet edge tolerance.
-          const overhangX = Math.min(supportOverhangX, edgeTolerance);
-          const overhangY = Math.min(supportOverhangY, edgeTolerance);
-
-          const step = Math.max(
-            1,
-            Math.min(3, Math.round(Math.min(variant.width, variant.depth) / 8)),
-          );
-
-          const xs =
-            surface.z > GEOMETRY_EPS
-              ? getSupportAnchoredAxisPositions(
-                  surface.x,
-                  surface.width,
-                  variant.width,
-                  supportBoxes,
-                  true,
-                  overhangX,
-                )
-              : getSurfaceAxisPositions(
-                  surface.x,
-                  surface.width,
-                  variant.width,
-                  localPlaced,
-                  true,
-                  overhangX,
-                  step,
-                );
-          const ys =
-            surface.z > GEOMETRY_EPS
-              ? getSupportAnchoredAxisPositions(
-                  surface.y,
-                  surface.depth,
-                  variant.depth,
-                  supportBoxes,
-                  false,
-                  overhangY,
-                )
-              : getSurfaceAxisPositions(
-                  surface.y,
-                  surface.depth,
-                  variant.depth,
-                  localPlaced,
-                  false,
-                  overhangY,
-                  step,
-                );
-
-          for (const x of xs) {
-            for (const y of ys) {
-              const candidate = normalizePlacementGeometry({
-                id: createId(),
-                boxId: typeId,
-                name: entry.template.name,
-                originalWidth: Number(entry.template.width),
-                originalDepth: Number(entry.template.depth),
-                originalHeight: Number(entry.template.height),
-                width: variant.width,
-                depth: variant.depth,
-                height: variant.height,
-                weight: Number(entry.template.weight),
-                color: entry.template.color,
-                x,
-                y,
-                z: surface.z,
-                rotationX: variant.rotationX,
-                rotationY: variant.rotationY,
-                layer: surface.z,
-              });
-
-              if (!fitsInside(pallet, candidate, candidate, true)) continue;
-
-              // Candidate must overlap the merged support surface footprint;
-              // true support sufficiency is enforced below by supportFraction.
-              const overlapsSurface =
-                candidate.x < surface.x + surface.width - GEOMETRY_EPS &&
-                candidate.x + candidate.width > surface.x + GEOMETRY_EPS &&
-                candidate.y < surface.y + surface.depth - GEOMETRY_EPS &&
-                candidate.y + candidate.depth > surface.y + GEOMETRY_EPS;
-              if (!overlapsSurface) continue;
-
-              if (placed.some((other) => collide(candidate, other))) continue;
-              if (localPlaced.some((other) => collide(candidate, other))) {
-                continue;
-              }
-
-              // Keep the local mini-layer contiguous so it creates usable
-              // merged support surfaces above instead of fragmented islands.
-              if (!hasSurfaceAdjacency(candidate, localPlaced)) {
-                continue;
-              }
-
-              const supportFraction = computeSupportFraction(
-                candidate,
-                [...placed, ...localPlaced],
-                pallet,
-              );
-              if (
-                supportFraction <
-                getRequiredSupportFraction(candidate, minSupportFraction)
-              ) {
-                continue;
-              }
-
-              if (
-                candidate.z > GEOMETRY_EPS &&
-                !hasSupportAnchorAlignment(candidate, [
-                  ...placed,
-                  ...localPlaced,
-                ])
-              ) {
-                continue;
-              }
-
-              const score = scoreSurfaceCandidate(
-                strategy,
-                candidate,
-                surface,
-                localPlaced,
-                overhangX,
-                overhangY,
-                supportFraction,
-              );
-
-              if (!best || score > best.score) {
-                best = { typeId, candidate, score };
-              }
-            }
-          }
+        if (
+          !bestPlan ||
+          plan.count > bestPlan.count ||
+          (plan.count === bestPlan.count &&
+            plan.filledArea > bestPlan.filledArea)
+        ) {
+          bestPlan = plan;
         }
       }
-
-      if (best) break;
     }
 
-    if (!best) break;
-    const selected: { typeId: string; candidate: PlacedBox; score: number } =
-      best;
-
-    localPlaced.push(selected.candidate);
-    remainingByType[selected.typeId] = Math.max(
-      0,
-      (remainingByType[selected.typeId] ?? 0) - 1,
-    );
-    usedByType[selected.typeId] = (usedByType[selected.typeId] ?? 0) + 1;
+    if (bestPlan) break;
   }
 
-  const filledArea = localPlaced.reduce(
-    (sum, box) => sum + box.width * box.depth,
-    0,
+  return (
+    bestPlan ?? {
+      placements: [] as PlacedBox[],
+      usedByType: {} as Record<string, number>,
+      count: 0,
+      filledArea: 0,
+    }
   );
-
-  return {
-    placements: localPlaced,
-    usedByType,
-    count: localPlaced.length,
-    filledArea,
-  };
 }
 
 function fillTopSurfacesMiniLayer(
@@ -2030,51 +1963,18 @@ function fillTopSurfacesMiniLayer(
       if (surface.area <= GEOMETRY_EPS) continue;
       if (surface.z >= pallet.height - GEOMETRY_EPS) continue;
 
-      const strategies: SurfacePackingStrategy[] = [
-        "count-dense",
-        "row-fill",
-        "area-fill",
-      ];
-
-      let bestPlan: {
-        placements: PlacedBox[];
-        usedByType: Record<string, number>;
-        count: number;
-        filledArea: number;
-      } | null = null;
-
-      for (const strategy of strategies) {
-        const result = solveSurfaceMiniPacking(
-          surface,
-          placed,
-          inventory,
-          pallet,
-          minSupportFraction,
-          strategy,
-        );
-
-        if (
-          !bestPlan ||
-          result.count > bestPlan.count ||
-          (result.count === bestPlan.count &&
-            result.filledArea > bestPlan.filledArea)
-        ) {
-          bestPlan = result;
-        }
-      }
-
-      if (!bestPlan || bestPlan.count === 0) continue;
-
-      const compactedPlacements = compactSurfacePlacements(
+      const bestPlan = solveSurfaceMiniPacking(
         surface,
-        bestPlan.placements,
         placed,
+        inventory,
         pallet,
         minSupportFraction,
       );
 
+      if (!bestPlan || bestPlan.count === 0) continue;
+
       keepPacking = true;
-      placed.push(...compactedPlacements);
+      placed.push(...bestPlan.placements);
 
       for (const [typeId, usedCount] of Object.entries(bestPlan.usedByType)) {
         const entry = inventory.find((item) => item.template.id === typeId);
@@ -2082,7 +1982,7 @@ function fillTopSurfacesMiniLayer(
         entry.remaining = Math.max(0, entry.remaining - usedCount);
       }
 
-      for (const candidate of compactedPlacements) {
+      for (const candidate of bestPlan.placements) {
         const existing = newFootprintsByType.get(candidate.boxId) ?? [];
         existing.push(candidate);
         newFootprintsByType.set(candidate.boxId, existing);

@@ -2,11 +2,14 @@
   "name": "palletflow",
   "version": "0.1.0",
   "private": true,
+  "description": "Interactive 3D pallet packing optimizer built with Next.js, React Three Fiber, and TypeScript.",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "typecheck": "tsc --noEmit",
+    "check": "npm run lint && npm run typecheck"
   },
   "dependencies": {
     "@react-three/drei": "^9.122.0",
@@ -15,8 +18,7 @@
     "next": "14.2.5",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
-    "three": "^0.166.1",
-    "zustand": "^4.4.4"
+    "three": "^0.166.1"
   },
   "devDependencies": {
     "@types/node": "^20.17.6",

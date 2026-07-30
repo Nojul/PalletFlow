@@ -10,10 +10,16 @@ type PackingOptions = {
   requireAccessibility?: boolean;
 };
 
+/**
+ * Returns the rectangular volume in cubic units for the provided dimensions.
+ */
 export function getVolume(width: number, depth: number, height: number) {
   return width * depth * height;
 }
 
+/**
+ * Routes packing requests to the configured algorithm while preserving one public entry point.
+ */
 export function buildPackingPlan(
   pallet: PalletConfig,
   boxes: BoxTemplate[],
@@ -27,6 +33,9 @@ export function buildPackingPlan(
   return buildGreedyPackingPlan(pallet, boxes, options);
 }
 
+/**
+ * Computes aggregate packing metrics used throughout the dashboard UI.
+ */
 export function summarizePacking(pallet: PalletConfig, placed: PlacedBox[]) {
   const totalVolume = pallet.width * pallet.depth * pallet.height;
   const usedVolume = placed.reduce(

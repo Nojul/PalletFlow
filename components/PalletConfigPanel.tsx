@@ -7,6 +7,7 @@ import {
   ChevronRight,
   Square,
 } from "lucide-react";
+import { normalizeNumberInput, parseNumberInput } from "@/lib/ui";
 
 type Props = {
   config: PalletConfig;
@@ -55,16 +56,6 @@ const presets: Array<{ label: string; config: PalletConfig }> = [
 ];
 
 export function PalletConfigPanel({ config, onChange }: Props) {
-  const normalizeNumberInput = (value: string) => {
-    if (value === "") return "";
-    if (value === "0") return "0";
-    if (value.startsWith("0") && !value.startsWith("0.")) {
-      const stripped = value.replace(/^0+/, "");
-      return stripped === "" ? "0" : stripped;
-    }
-    return value;
-  };
-
   const [local, setLocal] = useState<Record<string, string>>({
     width: String(config.width ?? ""),
     depth: String(config.depth ?? ""),
@@ -155,7 +146,7 @@ export function PalletConfigPanel({ config, onChange }: Props) {
                       }}
                       onBlur={() => {
                         const raw = local[item.field as string];
-                        const parsed = raw === "" ? 0 : Number(raw);
+                        const parsed = parseNumberInput(raw);
                         update(item.field as keyof PalletConfig, parsed);
                       }}
                       className="w-full rounded-2xl border border-slate-800 bg-slate-950/90 px-3 py-2 pr-12 text-white outline-none transition focus:border-brand-400"
@@ -203,7 +194,7 @@ export function PalletConfigPanel({ config, onChange }: Props) {
                   }}
                   onBlur={() => {
                     const raw = local.edgeOverflowTolerance;
-                    const parsed = raw === "" ? 0 : Number(raw);
+                    const parsed = parseNumberInput(raw);
                     update("edgeOverflowTolerance", parsed);
                   }}
                   className="w-full rounded-2xl border border-slate-800 bg-slate-950/90 px-3 py-2 pr-12 text-white outline-none transition focus:border-brand-400"

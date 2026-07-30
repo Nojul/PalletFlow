@@ -4,13 +4,19 @@ import { useMemo, useState } from "react";
 import { BoxPreset } from "@/lib/types";
 import { BOX_PRESETS_STORAGE_KEY } from "@/lib/presetStorage";
 import { Plus, Trash2, Pencil, Check, X } from "lucide-react";
+import {
+  createClientId,
+  normalizeNumberInput,
+  parseNumberInput,
+  PRESETS_UPDATED_EVENT,
+} from "@/lib/ui";
 
 type Props = {
   presets: BoxPreset[];
 };
 
 const blankPreset = (): BoxPreset => ({
-  id: `preset-${Math.random().toString(36).slice(2, 8)}`,
+  id: createClientId("preset"),
   name: "",
   width: 40,
   depth: 30,
@@ -41,16 +47,6 @@ export function BoxPresetsManager({ presets }: Props) {
 
   const isEditing = editId !== null;
 
-  const normalizeNumberInput = (value: string) => {
-    if (value === "") return "";
-    if (value === "0") return "0";
-    if (value.startsWith("0") && !value.startsWith("0.")) {
-      const stripped = value.replace(/^0+/, "");
-      return stripped === "" ? "0" : stripped;
-    }
-    return value;
-  };
-
   const handleChange = (field: keyof BoxPreset, value: string | number) => {
     if (field === "name") {
       setDraft((current) => ({ ...current, [field]: String(value) }));
@@ -77,24 +73,23 @@ export function BoxPresetsManager({ presets }: Props) {
     const nextPreset = {
       ...draft,
       name: (draftStr.name || draft.name).trim() || "New preset",
-      width: Number(draftStr.width || String(draft.width)) || 0,
-      depth: Number(draftStr.depth || String(draft.depth)) || 0,
-      height: Number(draftStr.height || String(draft.height)) || 0,
-      weight: Number(draftStr.weight || String(draft.weight)) || 0,
+      width: parseNumberInput(draftStr.width || String(draft.width)),
+      depth: parseNumberInput(draftStr.depth || String(draft.depth)),
+      height: parseNumberInput(draftStr.height || String(draft.height)),
+      weight: parseNumberInput(draftStr.weight || String(draft.weight)),
     } as BoxPreset;
 
     const updated = isEditing
       ? presets.map((preset) => (preset.id === editId ? nextPreset : preset))
       : [...presets, nextPreset];
 
-    // persist and notify parent via event
     try {
       localStorage.setItem(BOX_PRESETS_STORAGE_KEY, JSON.stringify(updated));
       window.dispatchEvent(
-        new CustomEvent("presets:update", { detail: updated }),
+        new CustomEvent(PRESETS_UPDATED_EVENT, { detail: updated }),
       );
     } catch {
-      // ignore storage errors
+      // Ignore storage failures and keep the in-memory edit flow intact.
     }
 
     resetForm();
@@ -119,10 +114,10 @@ export function BoxPresetsManager({ presets }: Props) {
     try {
       localStorage.setItem(BOX_PRESETS_STORAGE_KEY, JSON.stringify(updated));
       window.dispatchEvent(
-        new CustomEvent("presets:update", { detail: updated }),
+        new CustomEvent(PRESETS_UPDATED_EVENT, { detail: updated }),
       );
     } catch {
-      // ignore
+      // Ignore storage failures and keep the in-memory edit flow intact.
     }
     if (editId === id) {
       resetForm();
@@ -228,7 +223,7 @@ export function BoxPresetsManager({ presets }: Props) {
                                 const raw =
                                   draftStr[field.key] ??
                                   String(draft[field.key as keyof BoxPreset]);
-                                const parsed = raw === "" ? 0 : Number(raw);
+                                const parsed = parseNumberInput(raw);
                                 setDraft((cur) => ({
                                   ...cur,
                                   [field.key]: parsed,
@@ -247,8 +242,6 @@ export function BoxPresetsManager({ presets }: Props) {
                     );
                   })}
                 </div>
-
-                {/* color removed from presets */}
 
                 <div className="flex flex-wrap items-center gap-3">
                   <button
@@ -330,10 +323,6 @@ export function BoxPresetsManager({ presets }: Props) {
                         Delete
                       </button>
                     </div>
-                  </div>
-                  <div className="mt-4 grid gap-2 sm:grid-cols-2 text-sm text-slate-300">
-                    {/* quantity removed from presets */}
-                    {/* color removed from presets */}
                   </div>
                 </div>
               ))}

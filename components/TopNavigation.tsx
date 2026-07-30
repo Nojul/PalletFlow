@@ -1,6 +1,7 @@
 "use client";
 
 import { Users, LayoutGrid, Layers, PackageOpen } from "lucide-react";
+import { SECTION_SELECTED_EVENT } from "@/lib/ui";
 
 type Section = "optimizer" | "presets" | "about us";
 
@@ -18,7 +19,7 @@ const sections: Array<{ id: Section; label: string; icon: typeof LayoutGrid }> =
 export function TopNavigation({ activeSection }: Props) {
   const handleSelect = (section: Section) => {
     window.dispatchEvent(
-      new CustomEvent("palletflow:select-section", { detail: section }),
+      new CustomEvent(SECTION_SELECTED_EVENT, { detail: section }),
     );
   };
 

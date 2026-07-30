@@ -11,37 +11,27 @@ import { TopNavigation } from "@/components/TopNavigation";
 import { AboutUsPage } from "@/components/AboutUsPage";
 import { buildPackingPlan, summarizePacking } from "@/lib/packing";
 import {
+  buildLevelOptions,
+  buildPackingWarnings,
+  defaultBoxes,
+  getVisibilityCounts,
+  HomeSection,
+  PlacedPlanBox,
+} from "@/lib/homePage";
+import {
   BOX_PRESETS_STORAGE_KEY,
   defaultBoxPresets,
   parseStoredBoxPresets,
 } from "@/lib/presetStorage";
 import { BoxPreset, BoxTemplate, PalletConfig } from "@/lib/types";
-
-// Derive default boxes from the canonical presets to keep a single source of truth.
-const palette = ["#38bdf8", "#a855f7", "#34d399", "#f97316", "#facc15"];
-const defaultBoxes: BoxTemplate[] = defaultBoxPresets
-  .slice(0, 3)
-  .map((p, i) => ({
-    id: `box-from-preset-${p.id}`,
-    name: p.name,
-    width: p.width,
-    depth: p.depth,
-    height: p.height,
-    weight: p.weight,
-    quantity: i === 0 ? 64 : i === 1 ? 12 : i === 2 ? 8 : 4,
-    color: palette[i % palette.length],
-  }));
+import { PRESETS_UPDATED_EVENT, SECTION_SELECTED_EVENT } from "@/lib/ui";
 
 export default function HomePage() {
   const [pallet, setPallet] = useState<PalletConfig>(euroPallet);
   const [boxes, setBoxes] = useState<BoxTemplate[]>(defaultBoxes);
   const [presets, setPresets] = useState<BoxPreset[]>(defaultBoxPresets);
-  const [activeSection, setActiveSection] = useState<
-    "optimizer" | "presets" | "about us"
-  >("optimizer");
-  const [placedBoxes, setPlacedBoxes] = useState(
-    [] as Array<ReturnType<typeof buildPackingPlan>[number]>,
-  );
+  const [activeSection, setActiveSection] = useState<HomeSection>("optimizer");
+  const [placedBoxes, setPlacedBoxes] = useState<PlacedPlanBox[]>([]);
   const [activeLayer, setActiveLayer] = useState<number | "all">(0);
   const [hovered, setHovered] = useState<string | null>(null);
   const [showScannableOnly, setShowScannableOnly] = useState(false);
@@ -64,47 +54,25 @@ export default function HomePage() {
       const detail = (e as CustomEvent).detail as BoxPreset[];
       setPresets(detail);
     };
-    window.addEventListener("presets:update", handler);
-    return () => window.removeEventListener("presets:update", handler);
+    window.addEventListener(PRESETS_UPDATED_EVENT, handler);
+    return () => window.removeEventListener(PRESETS_UPDATED_EVENT, handler);
   }, []);
 
   useEffect(() => {
     const handleNavigation = (event: Event) => {
-      const section = (event as CustomEvent<string>).detail as
-        | "optimizer"
-        | "presets"
-        | "about us";
+      const section = (event as CustomEvent<string>).detail as HomeSection;
       setActiveSection(section);
     };
 
-    window.addEventListener("palletflow:select-section", handleNavigation);
+    window.addEventListener(SECTION_SELECTED_EVENT, handleNavigation);
     return () =>
-      window.removeEventListener("palletflow:select-section", handleNavigation);
+      window.removeEventListener(SECTION_SELECTED_EVENT, handleNavigation);
   }, []);
 
-  const levelOptions = useMemo(() => {
-    const uniqueLevels = Array.from(
-      new Set(placedBoxes.map((item) => item.layer)),
-    ).sort((a, b) => a - b);
-
-    const levelItems = uniqueLevels.map((layer, index) => ({
-      value: layer,
-      label: index === 0 ? "First level" : `Level ${index + 1}`,
-      subtitle:
-        layer === 0
-          ? "Ground floor"
-          : `  Height: ${placedBoxes.find((b) => b.layer === layer)?.z} cm`,
-    }));
-
-    return [
-      {
-        value: "all" as const,
-        label: "All levels",
-        subtitle: "View the full stack",
-      },
-      ...levelItems,
-    ];
-  }, [placedBoxes]);
+  const levelOptions = useMemo(
+    () => buildLevelOptions(placedBoxes),
+    [placedBoxes],
+  );
 
   useEffect(() => {
     if (!levelOptions.some((item) => item.value === activeLayer)) {
@@ -146,15 +114,7 @@ export default function HomePage() {
   );
 
   const visibilityCounts = useMemo(
-    () => ({
-      visible: placedBoxes.filter(
-        (box) => box.visibilityStatus === "side-visible",
-      ).length,
-      topOnly: placedBoxes.filter((box) => box.visibilityStatus === "top-only")
-        .length,
-      hidden: placedBoxes.filter((box) => box.visibilityStatus === "hidden")
-        .length,
-    }),
+    () => getVisibilityCounts(placedBoxes),
     [placedBoxes],
   );
 
@@ -162,39 +122,21 @@ export default function HomePage() {
     () => summarizePacking(pallet, placedBoxes),
     [pallet, placedBoxes],
   );
-  const warnings = useMemo(() => {
-    const result: string[] = [];
-    if (metrics.totalWeight > pallet.maxWeight) {
-      result.push("Total weight exceeds pallet capacity.");
-    }
-    if (metrics.maxHeight > pallet.height) {
-      result.push("Height limit overflow detected.");
-    }
-    if (placedBoxes.length < totalBoxes) {
-      result.push(
-        `${totalBoxes - placedBoxes.length} boxes could not be placed.`,
-      );
-    }
-    if (visibilityCounts.hidden > 0) {
-      result.push(
-        `${visibilityCounts.hidden} boxes are not externally visible.`,
-      );
-    }
-    if (visibilityCounts.topOnly > 0) {
-      result.push(
-        `${visibilityCounts.topOnly} boxes only have top visibility.`,
-      );
-    }
-    return result;
-  }, [
-    metrics,
-    pallet.maxWeight,
-    pallet.height,
-    placedBoxes.length,
-    totalBoxes,
-    visibilityCounts.hidden,
-    visibilityCounts.topOnly,
-  ]);
+  const warnings = useMemo(
+    () =>
+      buildPackingWarnings(pallet, placedBoxes, totalBoxes, visibilityCounts, {
+        totalWeight: metrics.totalWeight,
+        maxHeight: metrics.maxHeight,
+      }),
+    [
+      metrics.maxHeight,
+      metrics.totalWeight,
+      pallet,
+      placedBoxes,
+      totalBoxes,
+      visibilityCounts,
+    ],
+  );
 
   const hoveredDetails = placedBoxes.find((box) => box.id === hovered);
 
