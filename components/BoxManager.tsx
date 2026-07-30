@@ -66,6 +66,12 @@ export function BoxManager({ boxes, onChange, presets = [] }: Props) {
   );
 
   useEffect(() => {
+    if (window.matchMedia("(max-width: 640px)").matches) {
+      setExpanded(false);
+    }
+  }, []);
+
+  useEffect(() => {
     setExpandedIds((prev) => {
       const next = { ...prev };
       boxes.forEach((box) => {

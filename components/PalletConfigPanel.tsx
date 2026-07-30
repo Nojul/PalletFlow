@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { PalletConfig, PackingAlgorithm } from "@/lib/types";
 import {
   ArrowRight,
+  CircleHelp,
   CircleDollarSign,
   ChevronDown,
   ChevronRight,
@@ -57,6 +58,13 @@ const presets: Array<{ label: string; config: PalletConfig }> = [
   },
 ];
 
+const optimizationModeDescriptions: Record<PackingAlgorithm, string> = {
+  greedy:
+    "Fast placement mode. Prioritizes quick candidate selection for rapid results.",
+  layered:
+    "Optimized stacking mode. Focuses on more structured layer composition for steadier layouts.",
+};
+
 export function PalletConfigPanel({ config, onChange }: Props) {
   const [local, setLocal] = useState<Record<string, string>>({
     width: String(config.width ?? ""),
@@ -89,10 +97,19 @@ export function PalletConfigPanel({ config, onChange }: Props) {
     onChange({ ...config, [field]: value });
   };
 
+  const selectedMode: PackingAlgorithm = config.packingAlgorithm ?? "greedy";
+  const [modeInfoOpen, setModeInfoOpen] = useState(false);
+
   const [expanded, setExpanded] = useState(true);
 
+  useEffect(() => {
+    if (window.matchMedia("(max-width: 640px)").matches) {
+      setExpanded(false);
+    }
+  }, []);
+
   return (
-    <section className="space-y-3 rounded-3xl border border-slate-800/80 bg-slate-950/70 p-4 shadow-soft backdrop-blur-sm">
+    <section className="relative z-40 space-y-3 rounded-3xl border border-slate-800/80 bg-slate-950/70 p-4 shadow-soft backdrop-blur-sm">
       <div className="flex items-center justify-between gap-3">
         <button
           type="button"
@@ -164,11 +181,31 @@ export function PalletConfigPanel({ config, onChange }: Props) {
 
           <div className="grid gap-2 sm:grid-cols-2">
             <label className="block text-sm text-slate-300">
-              <span className="mb-2 block text-slate-400">
-                Optimization mode
+              <span className="mb-2 flex items-center gap-2 text-slate-400">
+                <span>Optimization mode</span>
+                <span className="relative z-40 inline-flex items-center">
+                  <button
+                    type="button"
+                    onMouseEnter={() => setModeInfoOpen(true)}
+                    onMouseLeave={() => setModeInfoOpen(false)}
+                    onFocus={() => setModeInfoOpen(true)}
+                    onBlur={() => setModeInfoOpen(false)}
+                    onClick={() => setModeInfoOpen((current) => !current)}
+                    aria-label="Show optimization mode details"
+                    aria-expanded={modeInfoOpen}
+                    className="inline-flex h-5 w-5 items-center justify-center rounded-full border border-slate-700 text-slate-400 transition hover:border-brand-400 hover:text-brand-300"
+                  >
+                    <CircleHelp size={12} />
+                  </button>
+                  {modeInfoOpen && (
+                    <div className="absolute left-0 top-7 z-[120] w-64 rounded-xl border border-slate-700 bg-slate-950/95 p-3 text-xs leading-relaxed text-slate-300 shadow-xl">
+                      {optimizationModeDescriptions[selectedMode]}
+                    </div>
+                  )}
+                </span>
               </span>
               <select
-                value={config.packingAlgorithm ?? "greedy"}
+                value={selectedMode}
                 onChange={(event) =>
                   update(
                     "packingAlgorithm",

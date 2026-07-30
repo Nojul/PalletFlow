@@ -156,8 +156,8 @@ export default function HomePage() {
               </div>
             </header>
 
-            <div className="grid gap-5 lg:grid-cols-[minmax(260px,1fr)_minmax(0,1.8fr)_minmax(220px,1fr)] xl:grid-cols-[minmax(260px,320px)_minmax(0,1.8fr)_minmax(220px,320px)]">
-              <div className="space-y-5">
+            <div className="relative isolate grid gap-5 lg:grid-cols-[minmax(260px,1fr)_minmax(0,1.8fr)_minmax(220px,1fr)] xl:grid-cols-[minmax(260px,320px)_minmax(0,1.8fr)_minmax(220px,320px)]">
+              <div className="relative z-30 space-y-5">
                 <PalletConfigPanel config={pallet} onChange={setPallet} />
                 <BoxManager
                   boxes={boxes}
@@ -166,7 +166,7 @@ export default function HomePage() {
                 />
               </div>
 
-              <div className="space-y-6">
+              <div className="relative z-10 space-y-6">
                 <div className="rounded-[2rem] border border-slate-800/80 bg-slate-950/70 p-4 shadow-soft">
                   <div className="min-h-[320px] h-[min(55vh,520px)]">
                     <PalletScene

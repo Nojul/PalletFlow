@@ -1,19 +1,6 @@
 # PalletFlow
 
-**Interactive 3D pallet packing optimizer for layout planning, visual validation, and packing strategy exploration.**
-
-![Next.js](https://img.shields.io/badge/Next.js-14-black?logo=next.js)
-![React](https://img.shields.io/badge/React-18-149eca?logo=react&logoColor=white)
-![TypeScript](https://img.shields.io/badge/TypeScript-5-3178c6?logo=typescript&logoColor=white)
-![Three.js](https://img.shields.io/badge/Three.js-3D-black?logo=three.js)
-![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-3-06b6d4?logo=tailwindcss&logoColor=white)
-![App Router](https://img.shields.io/badge/App_Router-Next.js-111111)
-
-<p align="center">
-  <img src="docs/media/home-optimizer.png" alt="PalletFlow optimizer dashboard" width="31%" />
-  <img src="docs/media/top-down-view.png" alt="PalletFlow top-down inspection" width="31%" />
-  <img src="docs/media/box-presets.png" alt="PalletFlow preset manager" width="31%" />
-</p>
+Interactive 3D pallet packing optimizer for layout planning, visual validation, and packing strategy exploration.
 
 ---
 
@@ -129,6 +116,13 @@ This keeps the application easy to reason about and lets the UI evolve independe
 
 Both strategies feed the same rendering and reporting pipeline, which keeps the rest of the application decoupled from implementation details.
 
+### Optimization Modes
+
+| Mode | Description | Best for |
+| --- | --- | --- |
+| Fast placement | Prioritizes speed and quickly evaluates candidate positions to produce a layout fast. | Rapid iteration and quick what-if checks. |
+| Optimized stacking | Emphasizes more structured layer composition and steadier stacking behavior. | More deliberate layouts where stack organization matters. |
+
 ### Engineering Focus
 
 - algorithm-oriented problem solving inside dedicated packing modules
@@ -224,4 +218,4 @@ docs/
 - Next.js for the application framework
 - React and TypeScript for the frontend foundation
 - Three.js, React Three Fiber, and Drei for 3D rendering and interaction
-- Lucide for the icon set
+- Lucide for the icon set<img width="1470" height="923" alt="Screenshot 2026-07-30 at 13 55 26" src="https://github.com/user-attachments/assets/61796e3d-3e13-45ca-8fce-7a84b7075a00" />
