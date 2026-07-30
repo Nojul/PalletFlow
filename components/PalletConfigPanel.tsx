@@ -24,6 +24,16 @@ export const euroPallet: PalletConfig = {
   edgeOverflowTolerance: 10,
 };
 
+export const usPallet: PalletConfig = {
+  width: 120,
+  depth: 100,
+  height: 200,
+  maxWeight: 1800,
+  unit: "cm",
+  packingAlgorithm: "layered",
+  edgeOverflowTolerance: 4,
+};
+
 const presets: Array<{ label: string; config: PalletConfig }> = [
   {
     label: "EUR pallet",
@@ -31,15 +41,7 @@ const presets: Array<{ label: string; config: PalletConfig }> = [
   },
   {
     label: "US pallet",
-    config: {
-      width: 120,
-      depth: 100,
-      height: 200,
-      maxWeight: 1800,
-      unit: "cm",
-      packingAlgorithm: "layered",
-      edgeOverflowTolerance: 0,
-    },
+    config: usPallet,
   },
   {
     label: "Post Canada pallet",

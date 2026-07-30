@@ -1,6 +1,6 @@
 # Dependency Inventory
 
-This document records the purpose and licensing posture of every direct dependency declared in [package.json](package.json).
+This document records the purpose and licensing posture of every direct dependency declared in [package.json](../package.json).
 
 ## Summary
 

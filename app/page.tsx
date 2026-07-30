@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { BoxManager } from "@/components/BoxManager";
 import { BoxPresetsManager } from "@/components/BoxPresetsManager";
 import { OptimizerSidebar } from "@/components/OptimizerSidebar";
-import { PalletConfigPanel, euroPallet } from "@/components/PalletConfigPanel";
+import { PalletConfigPanel, usPallet } from "@/components/PalletConfigPanel";
 import { PalletScene } from "@/components/PalletScene";
 import { TopDownView } from "@/components/TopDownView";
 import { TopNavigation } from "@/components/TopNavigation";
@@ -27,16 +27,13 @@ import { BoxPreset, BoxTemplate, PalletConfig } from "@/lib/types";
 import { PRESETS_UPDATED_EVENT, SECTION_SELECTED_EVENT } from "@/lib/ui";
 
 export default function HomePage() {
-  const [pallet, setPallet] = useState<PalletConfig>(euroPallet);
+  const [pallet, setPallet] = useState<PalletConfig>(usPallet);
   const [boxes, setBoxes] = useState<BoxTemplate[]>(defaultBoxes);
   const [presets, setPresets] = useState<BoxPreset[]>(defaultBoxPresets);
   const [activeSection, setActiveSection] = useState<HomeSection>("optimizer");
   const [placedBoxes, setPlacedBoxes] = useState<PlacedPlanBox[]>([]);
   const [activeLayer, setActiveLayer] = useState<number | "all">(0);
   const [hovered, setHovered] = useState<string | null>(null);
-  const [showScannableOnly, setShowScannableOnly] = useState(false);
-  const [useScannableOptimization, setUseScannableOptimization] =
-    useState(true);
   const [showBoxOutlines, setShowBoxOutlines] = useState(true);
   const [isOptimizing, setIsOptimizing] = useState(false);
 
@@ -87,12 +84,9 @@ export default function HomePage() {
 
     window.setTimeout(() => {
       try {
-        const plan = buildPackingPlan(pallet, boxes, {
-          scannableOptimization: useScannableOptimization,
-        });
+        const plan = buildPackingPlan(pallet, boxes);
         setPlacedBoxes(plan);
         setActiveLayer("all");
-        setShowScannableOnly(false);
       } catch (error) {
         console.error("Optimization failed", error);
       } finally {
@@ -105,7 +99,6 @@ export default function HomePage() {
     setPlacedBoxes([]);
     setActiveLayer(0);
     setHovered(null);
-    setShowScannableOnly(false);
   };
 
   const totalBoxes = boxes.reduce(
@@ -139,10 +132,6 @@ export default function HomePage() {
   );
 
   const hoveredDetails = placedBoxes.find((box) => box.id === hovered);
-
-  const displayedBoxes = showScannableOnly
-    ? placedBoxes.filter((box) => box.sideVisible)
-    : placedBoxes;
 
   return (
     <>
@@ -182,9 +171,8 @@ export default function HomePage() {
                   <div className="min-h-[320px] h-[min(55vh,520px)]">
                     <PalletScene
                       pallet={pallet}
-                      boxes={displayedBoxes}
+                      boxes={placedBoxes}
                       activeLayer={activeLayer}
-                      showOnlyScannable={showScannableOnly}
                       showBoxOutlines={showBoxOutlines}
                       highlightedBoxId={hovered}
                       onHoverBox={setHovered}
@@ -194,7 +182,7 @@ export default function HomePage() {
 
                 <TopDownView
                   pallet={pallet}
-                  boxes={displayedBoxes}
+                  boxes={placedBoxes}
                   activeLayer={activeLayer}
                   onHoverBox={setHovered}
                   hoveredId={hovered}
@@ -244,17 +232,9 @@ export default function HomePage() {
                 warnings={warnings}
                 activeLayer={activeLayer}
                 layers={levelOptions}
-                scannableOnly={showScannableOnly}
                 scannableCounts={visibilityCounts}
-                useScannableOptimization={useScannableOptimization}
                 showBoxOutlines={showBoxOutlines}
                 isOptimizing={isOptimizing}
-                onToggleScannableOnly={() =>
-                  setShowScannableOnly((current) => !current)
-                }
-                onToggleScannableOptimization={() =>
-                  setUseScannableOptimization((current) => !current)
-                }
                 onToggleBoxOutlines={() =>
                   setShowBoxOutlines((current) => !current)
                 }

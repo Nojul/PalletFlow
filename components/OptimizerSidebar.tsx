@@ -18,20 +18,16 @@ type Props = {
   warnings: string[];
   activeLayer: number | "all";
   layers: LevelOption[];
-  scannableOnly: boolean;
   isOptimizing?: boolean;
   scannableCounts: {
     visible: number;
     topOnly: number;
     hidden: number;
   };
-  useScannableOptimization: boolean;
   showBoxOutlines: boolean;
   onSelectLayer: (newLayer: number | "all") => void;
   onOptimize: () => void;
   onReset: () => void;
-  onToggleScannableOnly: () => void;
-  onToggleScannableOptimization: () => void;
   onToggleBoxOutlines: () => void;
 };
 
@@ -46,16 +42,12 @@ export function OptimizerSidebar({
   warnings,
   activeLayer,
   layers,
-  scannableOnly,
   scannableCounts,
-  useScannableOptimization,
   showBoxOutlines,
   isOptimizing = false,
   onSelectLayer,
   onOptimize,
   onReset,
-  onToggleScannableOnly,
-  onToggleScannableOptimization,
   onToggleBoxOutlines,
 }: Props) {
   const activeLabel =
@@ -153,26 +145,6 @@ export function OptimizerSidebar({
       </div>
 
       <div className="space-y-3 rounded-3xl bg-slate-900/80 p-3">
-        <label className="flex items-center gap-3 rounded-3xl border border-slate-800 bg-slate-950/90 px-3 py-3 text-sm text-slate-200">
-          <input
-            type="checkbox"
-            checked={useScannableOptimization}
-            onChange={onToggleScannableOptimization}
-            disabled={isOptimizing}
-            className="h-4 w-4 rounded border-slate-700 bg-slate-950 text-brand-500 focus:ring-brand-500 disabled:cursor-not-allowed disabled:opacity-50"
-          />
-          <span>Use Scannable Layout Optimization</span>
-        </label>
-
-        <button
-          type="button"
-          onClick={onToggleScannableOnly}
-          disabled={isOptimizing}
-          className="inline-flex w-full items-center justify-center gap-2 rounded-3xl border border-slate-800 bg-slate-950/90 px-3 py-2 text-sm font-semibold text-slate-200 transition hover:border-brand-400 disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          {scannableOnly ? "Show full layout" : "Scannable-only view"}
-        </button>
-
         <label className="flex items-center gap-3 rounded-3xl border border-slate-800 bg-slate-950/90 px-3 py-3 text-sm text-slate-200">
           <input
             type="checkbox"
