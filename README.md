@@ -35,7 +35,7 @@ https://github.com/user-attachments/assets/69524dda-1866-41db-80ac-53af6760eddc
 
 PalletFlow is a personal portfolio project built around a practical spatial optimization problem: placing boxes on a pallet in a way that is configurable, explainable, and easy to inspect visually.
 
-The application exposes the full workflow through a product-style interface — users can define pallet constraints, create reusable box templates, run packing strategies, and inspect the result in both 3D and top-down views with live metrics and visibility feedback.
+The application exposes the full workflow through a product-style interface, users can define pallet constraints, create reusable box templates, run packing strategies, and inspect the result in both 3D and top-down views with live metrics and visibility feedback.
 
 ## Why I Built It
 
@@ -88,11 +88,11 @@ Supports creating, editing, and reusing common box definitions without leaving t
 
 The project is organized so rendering, UI state, and algorithm logic remain separate and readable:
 
-- `app/` — page composition and application metadata
-- `components/` — UI surfaces, controls, and visualization layers
-- `lib/packing.ts` — public packing entry point used by the application
-- `lib/packing.greedy.ts` / `lib/packing.layered.ts` — the two algorithm implementations
-- `lib/` — shared types, defaults, storage helpers, and UI utilities
+- `app/` -> page composition and application metadata
+- `components/` -> UI surfaces, controls, and visualization layers
+- `lib/packing.ts` -> public packing entry point used by the application
+- `lib/packing.greedy.ts` / `lib/packing.layered.ts` -> the two algorithm implementations
+- `lib/` -> shared types, defaults, storage helpers, and UI utilities
 
 This keeps the application easy to reason about and lets the UI evolve independently from the packing engine.
 
